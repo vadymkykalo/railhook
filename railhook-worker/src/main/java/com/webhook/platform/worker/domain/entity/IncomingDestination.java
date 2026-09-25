@@ -19,14 +19,7 @@ public class IncomingDestination {
     @Id
     private UUID id;
 
-    /**
-     * Tenant discriminator, mapped but not enforced here: the api filters on this column via
-     * {@code @TenantId}, the worker deliberately does not — it has no {@code AuthContext} and
-     * every consumer is a system path. It is mapped rather than ignored because the attempt
-     * stores have to carry the tenant across from the parent row, and because
-     * {@code EntityMappingParityIntegrationTest} requires both modules to map every column of a
-     * shared table.
-     */
+    /** Not tenant-filtered here: the worker has no request tenant. Mapped so attempt rows can copy it. */
     @Column(name = "organization_id", nullable = false)
     private UUID organizationId;
 
@@ -62,12 +55,10 @@ public class IncomingDestination {
     @Column(name = "retry_delays", nullable = false, columnDefinition = "TEXT")
     private String retryDelays;
 
-    /** Which HTTP statuses are worth another Attempt. Read at claim time, parsed, and handed
-     * to the Runner on the {@code AttemptContext}. */
     @Column(name = "retryable_statuses", nullable = false, columnDefinition = "TEXT")
     private String retryableStatuses;
 
-    /** The current unbroken run of failed Attempts; the worker writes both at the shared seam. */
+    /** The current run of failed Attempts. Written by the worker, read by the api to auto-disable. */
     @Column(name = "failing_since")
     private Instant failingSince;
 
@@ -75,8 +66,7 @@ public class IncomingDestination {
     @Column(name = "consecutive_failures", nullable = false)
     private Integer consecutiveFailures = 0;
 
-    /** Set when Railhook turned this destination off, null when its owner did — the store tells
-     * the two apart to decide what happens to Forwards already queued. */
+    /** Null when the owner disabled it. Decides whether queued Forwards fail or go to the DLQ. */
     @Column(name = "auto_disabled_at")
     private Instant autoDisabledAt;
 

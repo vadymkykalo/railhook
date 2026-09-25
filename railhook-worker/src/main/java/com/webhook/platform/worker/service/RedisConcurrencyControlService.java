@@ -27,13 +27,8 @@ public class RedisConcurrencyControlService {
     private static final Duration KEY_TTL = Duration.ofHours(24);
 
     /**
-     * What a permit is counted against.
-     *
-     * <p>Two caps, because one of them was the wrong shape on its own. {@code TARGET} bounds how
-     * many attempts one receiver can have in flight, which stops a single slow endpoint taking
-     * the pool. It does nothing about a tenant with twenty slow endpoints: each stays inside its
-     * own slice and their sum is the whole worker, so every other organization stops being
-     * delivered to. {@code TENANT} is the cap on that sum.
+     * TARGET stops one slow receiver taking the pool. It does nothing about a tenant with twenty
+     * slow endpoints, whose sum is the whole worker; TENANT caps that sum.
      */
     public enum Scope {
         TENANT("concurrency:tenant:"),
@@ -48,8 +43,6 @@ public class RedisConcurrencyControlService {
 
     private final RedissonClient redissonClient;
     private final ConcurrentHashMap<String, String> acquiredPermits = new ConcurrentHashMap<>();
-    // Keyed by scope + id, not id alone: the same worker holds a tenant permit and a target
-    // permit at once, and they are different budgets.
     private final Cache<String, AtomicInteger> localPermits = Caffeine.newBuilder()
             .maximumSize(10_000)
             .expireAfterAccess(Duration.ofMinutes(5))
@@ -63,9 +56,6 @@ public class RedisConcurrencyControlService {
     private final int maxConcurrentPerTenant;
     private final int permitLeaseSeconds;
     private final Counter concurrencyAcquired;
-    // Rejections are split by scope: "the whole organization is at its ceiling" and "this one
-    // receiver is" are different operational facts. Without the tag an operator cannot tell
-    // whether the tenant cap is protecting the other tenants or throttling the only one.
     private final Map<Scope, Counter> concurrencyRejectedByScope = new EnumMap<>(Scope.class);
     private final Counter concurrencyReleased;
     private final Counter concurrencyFallback;
@@ -103,12 +93,10 @@ public class RedisConcurrencyControlService {
                 .register(meterRegistry);
     }
 
-    /** Bounds one organization's total in-flight attempts across every one of its targets. */
     public boolean tryAcquireForTenant(UUID tenantId) {
         return tryAcquire(Scope.TENANT, tenantId);
     }
 
-    /** Bounds in-flight attempts to one receiver. */
     public boolean tryAcquireForTarget(UUID targetId) {
         return tryAcquire(Scope.TARGET, targetId);
     }
@@ -133,36 +121,20 @@ public class RedisConcurrencyControlService {
         try {
             RPermitExpirableSemaphore semaphore = redissonClient.getPermitExpirableSemaphore(key);
             
-            // setPermits, not trySetPermits: the latter writes only when the key is absent, so a
-            // changed limit never reached a semaphore that traffic kept alive. setPermits counts
-            // the permits in flight and moves the total to the limit, which is a no-op when it
-            // already agrees.
+            // setPermits, not trySetPermits: the latter only writes an absent key, so a changed
+            // limit never reached a semaphore that traffic kept alive.
             if (initializedSemaphores.getIfPresent(key) == null) {
                 semaphore.setPermits(limit);
                 initializedSemaphores.put(key, Boolean.TRUE);
             }
 
-            // leaseTime bounds how long a permit can be held without release() being called.
-            // Without it an orphaned permit (crashed pod, or a code path that throws before
-            // the caller's finally) never comes back until the whole semaphore key's 24h TTL
-            // lapses, and that TTL only refreshes on a successful acquire — so an exhausted
-            // semaphore self-heals here even if the caller-side release is ever skipped again.
-            // waitTime 0: check and return, never block. Redisson's signature is
-            // tryAcquire(waitTime, leaseTime, unit) — one TimeUnit governs both — so the 100
-            // that used to sit here meant 100 *seconds* of waiting, not the 100 milliseconds
-            // it reads as. AttemptRunner.admit() treats this the way it treats the rate
-            // limiters and the breaker: a refusal is a Deferral, not something to wait out.
-            // Waiting instead pinned a BoundedAsyncExecutor thread per attempt, so a single
-            // saturated endpoint drained the outgoing pool, BoundedAsyncExecutor paused every
-            // Kafka container, and the worker stopped delivering for every tenant. The wait
-            // also outlasted the lease below, so a permit expired while still in use and the
-            // cap this class exists to enforce quietly stopped holding.
+            // waitTime 0: a refusal is a Deferral, not something to wait out. The old 100 meant 100
+            // seconds (one TimeUnit for both) and pinned a pool thread per attempt. The lease frees
+            // a permit orphaned by a crash.
             String permitId = semaphore.tryAcquire(0, permitLeaseSeconds, TimeUnit.SECONDS);
             if (permitId == null) {
-                // A refusal is also what a semaphore that is no longer there looks like: Redis
-                // runs allkeys-lru and may restart empty, and a missing key has zero permits.
-                // Trusting the local "initialised" mark would defer every attempt here until it
-                // expired, so the limit is re-asserted and the permit asked for once more.
+                // A missing key also refuses: Redis runs allkeys-lru and may restart empty, and a
+                // missing semaphore has zero permits. Re-assert the limit and ask once more.
                 semaphore.setPermits(limit);
                 permitId = semaphore.tryAcquire(0, permitLeaseSeconds, TimeUnit.SECONDS);
             }
@@ -228,9 +200,8 @@ public class RedisConcurrencyControlService {
                 activePermits.decrementAndGet();
             }
         } else if (releaseLocal(key)) {
-            // Only counted here if a local-fallback permit was actually held — otherwise
-            // this is a release() call with no matching acquire (e.g. a duplicate release,
-            // or a path with no permit to begin with) and must not drag the gauge negative.
+            // Only when a local permit was really held, so a duplicate release cannot push the
+            // gauge negative.
             activePermits.decrementAndGet();
             concurrencyReleased.increment();
         }

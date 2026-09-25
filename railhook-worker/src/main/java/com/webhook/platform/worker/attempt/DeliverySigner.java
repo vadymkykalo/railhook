@@ -13,13 +13,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Signs one Delivery's body for one Endpoint: which schemes that endpoint receives, which secrets
- * are live, and what may be shown of the result.
- *
- * <p>Both signatures are computed over the same bytes and the same timestamp, so a receiver
- * verifying either one gets the same answer.
- */
+/** Both schemes sign the same bytes with the same timestamp. */
 @Slf4j
 class DeliverySigner {
 
@@ -33,11 +27,7 @@ class DeliverySigner {
         this.clock = clock;
     }
 
-    /**
-     * A signature is null when the endpoint does not receive that scheme. The masked forms are what
-     * the dashboard shows: a signature is a shared secret's output, and printing one lets anyone
-     * who can read a delivery replay it.
-     */
+    /** Masked for the dashboard: anyone who can read a signature can replay the delivery. */
     record Signatures(long timestampMillis, String legacy, String standard) {
 
         long timestampSeconds() {
@@ -83,11 +73,7 @@ class DeliverySigner {
         }
     }
 
-    /**
-     * The retired secret while its grace window is open, otherwise null. Signing with both means the
-     * receiver's deploy and ours need not be simultaneous. A failure to decrypt this one is logged
-     * and dropped: the delivery is still correctly signed with the current secret.
-     */
+    /** A decrypt failure is only logged: the current secret still signs correctly. */
     private String retiredSecretInsideGraceWindow() {
         String encrypted = endpoint.getSecretPreviousEncrypted();
         Instant rotatedAt = endpoint.getSecretRotatedAt();

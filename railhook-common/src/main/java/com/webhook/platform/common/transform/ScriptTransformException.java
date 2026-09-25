@@ -3,35 +3,22 @@ package com.webhook.platform.common.transform;
 import java.util.List;
 
 /**
- * A script that did not produce a payload, for any reason.
- *
- * <p>Every one of these is treated the way a failed template is treated today: the attempt fails
- * and is retried, and the raw payload never goes out in its place. A transformation whose job is
- * to strip a field is exactly the transformation whose silent misfire nobody notices.
- *
- * <p>The {@link #reason()} is what the author is told and what the operator meters on; it is not
- * a retry decision. {@link #line()} is the line in the author's own script, already corrected
- * for the wrapper the engine puts around it.
+ * Any script run that produced no payload. The attempt fails and retries; the raw payload is
+ * never sent instead, since a transformation that strips a field is the one whose misfire nobody
+ * notices. {@link #reason()} is for the author and for metrics, not a retry decision.
  */
 public class ScriptTransformException extends RuntimeException {
 
-    /** Why the run produced nothing. */
     public enum Reason {
-        /** The script would not compile. */
         SYNTAX,
-        /** It compiled, but declares no {@code handler}, or returned something that is not one. */
+        /** No {@code handler}, or it returned something that is not an envelope. */
         CONTRACT,
-        /** It ran and threw, or reached for something the sandbox does not have. */
         RUNTIME,
-        /** It was still running when the wall clock ran out. */
         TIMEOUT,
-        /** It allocated past the ceiling. */
         MEMORY,
-        /** It returned a body larger than the ceiling. */
         OUTPUT_TOO_LARGE,
-        /** The script itself is larger than the engine will compile. */
         SOURCE_TOO_LARGE,
-        /** The engine is not on this classpath. A deployment fault, not an author's. */
+        /** The engine is not on this classpath: a deployment fault, not the author's. */
         UNAVAILABLE
     }
 
@@ -57,17 +44,15 @@ public class ScriptTransformException extends RuntimeException {
         return reason;
     }
 
-    /** 1-based line in the author's script, or -1 when the failure has no location. */
+    /** 1-based, already corrected for the engine's wrapper; -1 when unknown. */
     public int line() {
         return line;
     }
 
-    /** 1-based column, or -1. */
     public int column() {
         return column;
     }
 
-    /** Whatever the script logged before it failed — usually the only clue there is. */
     public List<ScriptConsoleLine> console() {
         return console;
     }

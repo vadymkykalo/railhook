@@ -7,10 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
-/**
- * The Outgoing direction's metric family. The names predate the Runner and stay as they are:
- * renaming a family inside a refactor breaks dashboards and alert rules.
- */
+/** Metric names predate the Runner and must not change: dashboards and alerts use them. */
 @Component
 public class DeliveryAttemptMetrics implements AttemptMetrics {
 
@@ -32,9 +29,7 @@ public class DeliveryAttemptMetrics implements AttemptMetrics {
                 .tag("result", "error").tag("status_class", "none").register(registry);
         this.transformFailedCounter = Counter.builder("transform_failed_total")
                 .tag("component", "outgoing_delivery").register(registry);
-        // A separate family from transform_failed_total, not a tag on it: one is an
-        // error rate somebody is paged for and the other is a filter doing its job, and
-        // an alert that cannot tell them apart fires on working configuration.
+        // Not a tag on transform_failed_total, so an error-rate alert ignores working filters.
         this.transformCancelledCounter = Counter.builder("transform_cancelled_total")
                 .tag("component", "outgoing_delivery").register(registry);
         this.latency2xx = Timer.builder("webhook_delivery_latency_ms")

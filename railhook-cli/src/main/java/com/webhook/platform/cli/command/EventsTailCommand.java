@@ -97,7 +97,7 @@ public class EventsTailCommand implements Callable<Integer> {
                         }
                     }
                 } catch (Exception e) {
-                    // Silently retry
+                    // Retried on the next poll.
                 }
             }
         }

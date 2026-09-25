@@ -14,10 +14,6 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Forwards incoming tunnel requests to the local application
- * running on localhost:{port} and captures the response.
- */
 public class LocalForwarder {
 
     private static final Logger log = LoggerFactory.getLogger(LocalForwarder.class);
@@ -34,9 +30,6 @@ public class LocalForwarder {
                 .build();
     }
 
-    /**
-     * Forward the tunnel request to the local application and return the response.
-     */
     public TunnelResponseMessage forward(TunnelRequestMessage request) {
         long startMs = System.currentTimeMillis();
 
@@ -53,10 +46,8 @@ public class LocalForwarder {
                     .uri(URI.create(url))
                     .timeout(TIMEOUT);
 
-            // Set headers
             if (request.getHeaders() != null) {
                 request.getHeaders().forEach((key, value) -> {
-                    // Skip restricted headers
                     String lower = key.toLowerCase();
                     if (!lower.equals("host") && !lower.equals("content-length") &&
                         !lower.equals("connection") && !lower.equals("transfer-encoding")) {
@@ -69,8 +60,7 @@ public class LocalForwarder {
                 });
             }
 
-            // Set method and body. The body is the bytes the provider sent, not a string encoded
-            // here: the local app checks the provider's signature over them.
+            // The provider's exact bytes: the local app checks the signature over them.
             byte[] body = request.bodyBytes();
             String method = request.getMethod() != null ? request.getMethod().toUpperCase() : "GET";
             switch (method) {
@@ -87,7 +77,6 @@ public class LocalForwarder {
             HttpResponse<byte[]> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofByteArray());
             long durationMs = System.currentTimeMillis() - startMs;
 
-            // Extract response headers
             Map<String, String> responseHeaders = new LinkedHashMap<>();
             response.headers().map().forEach((key, values) -> {
                 if (!values.isEmpty()) {

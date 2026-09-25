@@ -21,10 +21,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
-/**
- * The Incoming half of the pipeline: resolve the Event and Destination a Forward names, run an
- * Attempt, and hand the Forward back to the retry ladder when there is no room to run one.
- */
 @Service
 @Slf4j
 public class IncomingForwardService {
@@ -54,21 +50,8 @@ public class IncomingForwardService {
         this.metrics = metrics;
     }
 
-    /**
-     * Runs one Forward, and never throws.
-     *
-     * <p>This is called on a {@code BoundedAsyncExecutor} pool thread, and that executor reads a
-     * throw as "do not ack" — deliberately, because an unacked record is re-polled rather than
-     * lost. With {@code asyncAcks} on, though, an unacked offset holds up every commit for its
-     * partition, so a single transient {@code SQLException} here stopped every later incoming
-     * event on that partition until somebody restarted the worker.
-     *
-     * <p>Reprocessing is driven by the retry ladder and the stuck sweep, not by Kafka
-     * redelivery — the row is still PENDING or PROCESSING and both of those have an owner. So
-     * acking is right and the partition keeps moving, which is what
-     * {@code WebhookDeliveryService.processDelivery} has always done on the outgoing side. The
-     * asymmetry was an omission rather than a decision.
-     */
+    // Never throws: a throw means "do not ack", and under asyncAcks that stalled the partition.
+    // The retry ladder and the stuck sweep own the row, not Kafka redelivery.
     public void processForward(IncomingForwardMessage message) {
         try {
             runForward(message);
@@ -103,28 +86,13 @@ public class IncomingForwardService {
         IncomingEvent event = eventOpt.get();
         IncomingDestination destination = destOpt.get();
 
-        // Whether the Destination is still admissible belongs to the store, and URL validation to
-        // the Runner, both deliberately: settling either here marks the row FAILED without
-        // holding a Claim on it, which is looser than every other terminal path. Only the two
-        // cases above are settled here, because a row whose Event or Destination cannot be
-        // resolved at all has nothing to build a store from.
+        // Destination admissibility is the store's job and URL validation the Runner's: settling
+        // either here would mark the row FAILED without holding a Claim.
         attemptRunner.run(storeFactory.create(message, event, destination), metrics);
     }
 
-    /**
-     * Hands a Forward back to the retry ladder when the executor pool is full, so the consumer can
-     * ack instead of leaving the record unacked and stalling the partition.
-     *
-     * <p>Either way {@code next_retry_at} must be set — the scheduler ignores rows without one, so
-     * acking without stamping it strands the Forward.
-     *
-     * <p>Only the Claim this message would have taken is handed back, matched the way
-     * {@code IncomingAttemptStore} claims: a retry message on the {@code started_at} it was
-     * published with, anything else on a row still PENDING. Another copy of the message may hold
-     * the row with its POST on the wire, and taking it away lost that copy's 2xx and sent the
-     * Forward again. A retry message without {@code started_at} cannot tell which copy it is,
-     * and leaves the row to the stuck sweep.
-     */
+    // Hands back only the Claim this message would have taken: another copy may hold the row
+    // with its POST on the wire, and taking it sent the Forward twice.
     public void rescheduleForBackpressure(IncomingForwardMessage message) {
         UUID eventId = message.getIncomingEventId();
         UUID destinationId = message.getDestinationId();

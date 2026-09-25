@@ -27,13 +27,9 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Manages ordering buffer for FIFO delivery guarantees.
- * Tracks last delivered sequence per endpoint and buffers out-of-order deliveries.
- * Uses Redis as cache (24h TTL) with Postgres as durable fallback.
- *
- * <p>Redis is never allowed to stop an ordered endpoint. Its reads fall back to the Postgres
- * cursor and its writes are best effort: an exception escaping here surfaced in the claim, after
- * the Delivery was already PROCESSING, and left it to the stuck sweep until the hard cap.
+ * Redis is a cache here and must never stop an ordered endpoint. Reads fall back to the Postgres
+ * cursor and writes are best effort: an exception escaping here once surfaced in the claim, after
+ * the Delivery was already PROCESSING, and left it stuck until the hard cap.
  */
 @Service
 @Slf4j
@@ -51,9 +47,8 @@ public class OrderingBufferService {
     private final Duration deliveredSeqTtl;
     private final Duration bufferTtl;
     private final String cursorCasScript;
-    // Registered once, not per call: Micrometer keeps only the first meter for an untagged
-    // name, so re-registering made every later endpoint's gauge a no-op. Resynced from Redis
-    // rather than counted, because entries also vanish via TTL and the gap-timeout path.
+    // Registered once: Micrometer keeps only the first meter for an untagged name. Resynced
+    // from Redis rather than counted, because entries also vanish via TTL.
     private final AtomicLong totalBufferedDeliveries = new AtomicLong(0);
 
     public OrderingBufferService(
@@ -78,10 +73,7 @@ public class OrderingBufferService {
                 .register(meterRegistry);
     }
 
-    /**
-     * Recomputes the gauge by summing every per-endpoint buffer key. Aggregated rather than
-     * tagged: endpoint UUIDs are unbounded cardinality. {@code getKeysByPattern} is SCAN-based.
-     */
+    // Summed rather than tagged per endpoint: endpoint ids are unbounded cardinality.
     @Scheduled(fixedDelayString = "${ordering.buffer-gauge-resync-ms:30000}")
     public void resyncBufferSizeGauge() {
         try {
@@ -104,7 +96,6 @@ public class OrderingBufferService {
         }
     }
 
-    /** True when this is the next expected sequence; false means it should be buffered. */
     public boolean canDeliver(UUID endpointId, long sequenceNumber) {
         Long lastDelivered = getLastDeliveredSequence(endpointId);
         
@@ -115,16 +106,11 @@ public class OrderingBufferService {
         return sequenceNumber == lastDelivered + 1;
     }
 
-    /**
-     * Redis first, Postgres when the TTL has lapsed or Redis is unreachable. Null when nothing has
-     * been delivered.
-     */
     public Long getLastDeliveredSequence(UUID endpointId) {
         String key = DELIVERED_SEQ_KEY_PREFIX + endpointId;
         RBucket<Long> bucket = null;
         try {
-            // LongCodec: the CAS script in markDelivered() writes a plain decimal string, and
-            // Redisson's default Kryo codec cannot read it back. Every accessor must agree.
+            // The CAS script writes a plain decimal string that the default Kryo codec cannot read.
             bucket = redissonClient.getBucket(key, LongCodec.INSTANCE);
             Long fromRedis = bucket.get();
             if (fromRedis != null) {
@@ -163,14 +149,9 @@ public class OrderingBufferService {
     }
 
     /**
-     * Advances the cursor in Postgres, then in Redis.
-     *
-     * <p>Postgres is authoritative and applies {@code GREATEST}, so it cannot regress. Redis is
-     * then advanced from that value — never from the argument — by a CAS script that only moves
-     * the key upward, so the cache can converge towards Postgres but never fall behind it.
-     *
-     * <p>The Postgres write commits before Redis is touched. Both used to share one transaction,
-     * so a Redis error rolled the authoritative cursor back with it.
+     * Postgres is authoritative and applies GREATEST, so it cannot regress. Redis is then moved
+     * up to the Postgres value, never the argument, by a CAS script that only moves upward. The
+     * Postgres write commits first: sharing one transaction let a Redis error roll it back.
      */
     public void markDelivered(UUID endpointId, long sequenceNumber) {
         long authoritative;
@@ -180,8 +161,7 @@ public class OrderingBufferService {
         } catch (Exception e) {
             log.error("Failed to persist ordering cursor to DB for endpoint {}, seq={}: {}",
                     endpointId, sequenceNumber, e.getMessage());
-            // Best effort so the endpoint does not stall; this window is where a regression
-            // could occur, hence the loud log above.
+            // Keep going so the endpoint does not stall. A regression is possible only here.
             authoritative = sequenceNumber;
             postgresWriteFailed = true;
         }
@@ -212,9 +192,6 @@ public class OrderingBufferService {
         }
     }
 
-    /**
-     * Adds a delivery to the waiting buffer, released when its predecessor is delivered.
-     */
     public void bufferDelivery(UUID endpointId, UUID deliveryId, long sequenceNumber) {
         String key = BUFFER_KEY_PREFIX + endpointId;
         int bufferSize;
@@ -224,8 +201,7 @@ public class OrderingBufferService {
             buffer.expire(bufferTtl);
             bufferSize = buffer.size();
         } catch (Exception e) {
-            // The row is parked with a retry time either way; the entry only lets its
-            // predecessor's release send it sooner.
+            // The row is parked with a retry time anyway; the entry only lets it go sooner.
             log.warn("Redis unavailable buffering delivery {} (seq={}) for endpoint {}: {}",
                     deliveryId, sequenceNumber, endpointId, e.getMessage());
             return;
@@ -239,12 +215,9 @@ public class OrderingBufferService {
     }
 
     /**
-     * Deliveries whose turn has come: sequential numbers starting from the next expected one.
-     *
-     * <p>Also drops every entry the cursor has already passed. Only the entry at the next expected
-     * sequence used to leave, so a Delivery that parked and was then sent by the scheduler rather
-     * than by this trigger stayed in forever; each park refreshes the whole key's TTL, so a busy
-     * ordered endpoint's buffer never expired and only grew.
+     * Also drops every entry the cursor has passed. Without that, a Delivery sent by the
+     * scheduler instead of this trigger stayed in the buffer forever, and since each park
+     * refreshes the key's TTL a busy endpoint's buffer only grew.
      */
     public List<UUID> getReadyDeliveries(UUID endpointId) {
         Long lastDelivered = getLastDeliveredSequence(endpointId);
@@ -262,7 +235,6 @@ public class OrderingBufferService {
                 buffer.remove(deliveryIdStr);
             }
         } catch (Exception e) {
-            // Whatever is parked is re-polled by the scheduler at its own retry time.
             log.warn("Redis unavailable releasing buffered deliveries for endpoint {}: {}",
                     endpointId, e.getMessage());
         }
@@ -275,24 +247,17 @@ public class OrderingBufferService {
         return ready;
     }
 
-    /**
-     * How long a Delivery waits on a gap before it may be let through out of order. Declared
-     * once, here: the gate measures the blocking Delivery's next Attempt against the same window.
-     */
     public Duration gapTimeout() {
         return gapTimeout;
     }
 
     /**
-     * Has a delivery blocked on a missing predecessor waited longer than the gap timeout?
-     *
-     * <p>Measured from when it was first buffered, not from ingest: measuring from ingest made
-     * any backlog older than the timeout unconditionally true, silently turning ordering off
-     * during exactly the fan-out bursts it exists for. Callers, not this, count the metric.
+     * Measured from first buffering, not from ingest: measuring from ingest turned ordering off
+     * for any backlog older than the timeout, which is exactly the burst ordering exists for.
      */
     public boolean isGapTimedOut(Instant firstBufferedAt) {
         if (firstBufferedAt == null) {
-            return false; // Never buffered before -- we haven't started waiting yet.
+            return false;
         }
         return Duration.between(firstBufferedAt, Instant.now()).compareTo(gapTimeout) > 0;
     }
@@ -302,7 +267,6 @@ public class OrderingBufferService {
         try {
             redissonClient.getScoredSortedSet(key).remove(deliveryId.toString());
         } catch (Exception e) {
-            // Must not stop the caller moving the cursor; the entry is pruned once the cursor passes it.
             log.warn("Redis unavailable removing delivery {} from buffer for endpoint {}: {}",
                     deliveryId, endpointId, e.getMessage());
         }

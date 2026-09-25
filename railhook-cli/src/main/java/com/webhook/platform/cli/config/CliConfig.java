@@ -6,10 +6,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Persistent CLI configuration stored at ~/.config/railhook/config.json.
- * Supports named profiles for switching between environments (e.g. staging, production).
- */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CliConfig {
@@ -21,9 +17,8 @@ public class CliConfig {
     private String userId;
     private String activeProjectId;
 
-    /** Active profile name. Null means using root-level fields (legacy / default). */
+    /** Null means the root-level fields are the active configuration. */
     private String activeProfile;
-    /** Named profiles. Key = profile name, value = profile config. */
     private Map<String, ProfileConfig> profiles;
 
     public CliConfig() {
@@ -63,13 +58,11 @@ public class CliConfig {
                 .replace("http://", "ws://");
     }
 
-    /** Get or create the profiles map. */
     public Map<String, ProfileConfig> ensureProfiles() {
         if (profiles == null) profiles = new LinkedHashMap<>();
         return profiles;
     }
 
-    /** Snapshot the current root-level fields into a ProfileConfig. */
     public ProfileConfig toProfile() {
         ProfileConfig p = new ProfileConfig();
         p.setBackendUrl(backendUrl);
@@ -81,7 +74,6 @@ public class CliConfig {
         return p;
     }
 
-    /** Apply a ProfileConfig to root-level fields (switch active profile). */
     public void applyProfile(ProfileConfig p) {
         this.backendUrl = p.getBackendUrl() != null ? p.getBackendUrl() : "http://localhost:8080";
         this.accessToken = p.getAccessToken();
@@ -91,9 +83,6 @@ public class CliConfig {
         this.activeProjectId = p.getActiveProjectId();
     }
 
-    /**
-     * Per-profile configuration (stored inside the profiles map).
-     */
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class ProfileConfig {

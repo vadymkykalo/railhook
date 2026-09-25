@@ -51,7 +51,6 @@ public class ListenCommand implements Callable<Integer> {
 
         out.println("Creating tunnel session...");
 
-        // Step 1: Create tunnel session via REST API
         String query = "/api/v1/tunnels?localPort=" + port;
         if (projectId != null) query += "&projectId=" + projectId;
         query += "&clientInfo=railhook-cli/1.0.0";
@@ -63,7 +62,6 @@ public class ListenCommand implements Callable<Integer> {
 
         out.println("Tunnel created: " + tunnelId);
 
-        // Step 2: Connect WebSocket
         String wsUrl = config.getWsUrl();
         WebSocketTunnelClient wsClient = new WebSocketTunnelClient(wsUrl, tunnelToken, port);
 
@@ -86,7 +84,6 @@ public class ListenCommand implements Callable<Integer> {
         });
 
         wsClient.onRequest(request -> {
-            // Forward to local app in a separate thread
             CompletableFuture.runAsync(() -> {
                 var response = forwarder.forward(request);
                 wsClient.sendResponse(response);
@@ -101,7 +98,6 @@ public class ListenCommand implements Callable<Integer> {
 
         wsClient.onReconnecting(msg -> out.println("  [" + msg + "]"));
 
-        // Shutdown hook
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             out.println();
             out.println("Shutting down tunnel...");
@@ -109,14 +105,13 @@ public class ListenCommand implements Callable<Integer> {
             try {
                 client.delete("/api/v1/tunnels/" + tunnelId, Void.class);
             } catch (Exception e) {
-                // Best effort cleanup
+                // Best effort: the process is exiting anyway.
             }
             shutdownLatch.countDown();
         }));
 
         wsClient.connect();
 
-        // Block until shutdown
         shutdownLatch.await();
         out.println("Tunnel closed.");
         return 0;

@@ -16,17 +16,9 @@ import java.time.Duration;
 import java.util.UUID;
 
 /**
- * Redis-backed circuit breaker with shared state across all worker pods.
- *
- * State model (3 Redis keys per endpoint):
- *   cb:{id}:open  — marker key with TTL = waitDuration. EXISTS → OPEN, absent → CLOSED.
- *                    When TTL expires the circuit auto-transitions to CLOSED and new calls
- *                    act as "probes" (equivalent to HALF_OPEN). If failures recur the
- *                    circuit re-opens immediately.
- *   cb:{id}:fails — failure counter in the current evaluation window (TTL-based expiry).
- *   cb:{id}:calls — total-call counter in the current evaluation window.
- *
- * On Redis failure the breaker is fail-open (permits all calls).
+ * Breaker state shared by all workers through Redis. {@code cb:{id}:open} exists while the
+ * circuit is open and expires after the wait duration; the calls after that act as half-open
+ * probes. Fails open when Redis is unreachable.
  */
 @Service
 @Slf4j
@@ -74,12 +66,8 @@ public class CircuitBreakerService {
         this.slowTripCounter = Counter.builder("circuit_breaker_slow_trips_total")
                 .description("Circuit breaker trips due to slow call rate")
                 .register(meterRegistry);
-        // Failing open when Redis is unreachable is right — a blip must not stop deliveries.
-        // Failing open *silently* is not: a partially degraded Redis meant the breaker never
-        // tripped and never would, and there was no signal anywhere that said so. The two
-        // recording paths logged at DEBUG. RedisRateLimiterService and
-        // RedisConcurrencyControlService both already publish a fallback counter; this is the
-        // same idea under the same naming.
+        // Failing open on a Redis blip is right, but it must be visible: a degraded Redis once
+        // meant the breaker could never trip, with nothing above DEBUG to say so.
         this.degradedCounter = Counter.builder("circuit_breaker_degraded_total")
                 .description("Circuit breaker operations that could not reach Redis and failed open")
                 .register(meterRegistry);
@@ -131,8 +119,6 @@ public class CircuitBreakerService {
                 tripCircuit(endpointId, slowRate);
             }
         } catch (Exception e) {
-            // WARN, not DEBUG: every one of these is an outcome the breaker did not see, so a
-            // run of them means the breaker is not measuring anything and cannot trip.
             degradedCounter.increment();
             log.warn("Redis unavailable for circuit breaker success recording, endpoint {}: {}",
                     endpointId, e.getMessage());
@@ -181,7 +167,6 @@ public class CircuitBreakerService {
     private void tripCircuit(UUID endpointId, long failureRate) {
         RBucket<String> openBucket = redissonClient.getBucket(openKey(endpointId));
         openBucket.set("1", Duration.ofSeconds(waitDurationSeconds));
-        // Reset counters so the next evaluation window starts fresh after circuit reopens
         redissonClient.getKeys().delete(failsKey(endpointId), callsKey(endpointId), slowKey(endpointId));
         log.warn("CircuitBreaker OPENED for endpoint {} (failure rate: {}%, wait: {}s)",
                 endpointId, failureRate, waitDurationSeconds);

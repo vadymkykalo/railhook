@@ -10,11 +10,8 @@ import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 
 /**
- * The polling half of a retry scheduler: its own daemon thread, a startup jitter so replicas do
- * not poll in step, and a cadence the {@link RetryGovernor} sets from how deep the backlog is.
- *
- * <p>A poll that throws is logged and the next one is still scheduled — a loop that stops on the
- * first failure is a retry ladder that stops with it.
+ * Startup jitter keeps replicas from polling in step. A poll that throws is logged and the next
+ * one is still scheduled.
  */
 @Slf4j
 class AdaptivePollLoop {

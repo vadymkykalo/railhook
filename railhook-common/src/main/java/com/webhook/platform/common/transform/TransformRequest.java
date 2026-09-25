@@ -6,29 +6,12 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * Everything a script is allowed to see: the Event, and the context of the one Delivery or
- * Forward being attempted.
+ * Everything a script can see. Scripts are written against these names, so adding or changing
+ * one is a contract change.
  *
- * <p>This is the whole of the guest's world. Nothing else is reachable from inside the sandbox,
- * which is why the list is short and why growing it is a contract change rather than a tweak —
- * scripts are written against these names and they have to keep meaning the same thing.
- *
- * @param payload   the event body, as JSON text. Parsed inside the guest, never marshalled
- *                  across as host objects.
- * @param eventType the Event's type, or the incoming provider's event type
- * @param eventId   the Event's id
- * @param timestamp when the Event was announced
- * @param direction {@code OUTGOING} or {@code INCOMING}, in the vocabulary of {@code CONTEXT.md}
- * @param url       the Endpoint or Destination URL this attempt is aimed at. Readable, not
- *                  writable: letting a script choose the address would put it past the SSRF
- *                  checks the Runner makes before it ever gets here.
- * @param headers   the headers configured on the Endpoint or Destination this is going to.
- *                  Not Railhook's own — the signature, the ids and the sequence number are
- *                  computed after the script runs, and a script that could read a signature is a
- *                  script that could leak one.
- * @param attemptNumber which try this is, 1 for the first. A script that adds an idempotency
- *                  hint, or logs differently on a retry, needs it and cannot work it out. Null
- *                  in a preview, where there is no Attempt.
+ * <p>{@code url} is read-only because the SSRF checks have already run. {@code headers} are the
+ * configured ones only: signatures and ids are computed after the script, so a script cannot leak
+ * them. {@code attemptNumber} is null in a preview.
  */
 @Builder
 public record TransformRequest(

@@ -3,16 +3,7 @@ package com.webhook.platform.common.util;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Matches event types against subscription patterns.
- * <p>
- * Supported patterns:
- * <ul>
- *   <li>{@code order.completed} — exact match</li>
- *   <li>{@code order.*} — single-segment wildcard (matches {@code order.completed}, not {@code order.line.added})</li>
- *   <li>{@code order.**} — multi-segment wildcard (matches {@code order.completed} and {@code order.line.added})</li>
- *   <li>{@code *} — matches any single-segment event type</li>
- *   <li>{@code **} — catch-all, matches everything</li>
- * </ul>
+ * {@code order.*} matches exactly one segment, {@code order.**} any number, {@code **} everything.
  */
 public final class EventTypeMatcher {
 
@@ -54,7 +45,6 @@ public final class EventTypeMatcher {
                 }
                 return false;
             } else if ("*".equals(seg)) {
-                // single-segment wildcard — matches exactly one segment
                 pi++;
                 ei++;
             } else {
@@ -66,7 +56,6 @@ public final class EventTypeMatcher {
             }
         }
 
-        // skip trailing ** patterns
         while (pi < pattern.length && "**".equals(pattern[pi])) {
             pi++;
         }
@@ -74,17 +63,10 @@ public final class EventTypeMatcher {
         return pi == pattern.length && ei == event.length;
     }
 
-    /**
-     * Returns {@code true} if the pattern string contains wildcard characters.
-     */
     public static boolean isWildcard(String pattern) {
         return pattern != null && pattern.contains("*");
     }
 
-    /**
-     * Validates that a pattern is syntactically correct.
-     * Rules: segments separated by dots, each segment is lowercase alphanumeric/underscore, or {@code *}, or {@code **}.
-     */
     public static boolean isValidPattern(String pattern) {
         if (pattern == null || pattern.isBlank()) {
             return false;

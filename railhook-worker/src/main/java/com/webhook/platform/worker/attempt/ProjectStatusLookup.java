@@ -11,38 +11,22 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Whether the Project an Endpoint or a Source belongs to may still be sent for: the api deletes a
- * Project by stamping it, and suspends an Organization the same way, and neither touches the
- * Endpoints, Sources or Destinations underneath. Without asking this, a Delivery or Forward
- * already queued when either happened went on being sent for the rest of its Ladder.
- *
- * <p>Native, because the worker keeps no entity for {@code projects}, {@code organizations} or
- * {@code incoming_sources} — the only thing it reads from them is this. Unscoped by design: the
- * worker has no tenant of its own, and the id comes off a row it has already claimed.
- *
- * <p>Asked once per Attempt, so cached briefly per id. A deletion or a suspension takes effect
- * within the TTL, which is the window the api's own suspension cache already allows ingest.
+ * Project deletion and Organization suspension do not touch the Endpoints, Sources or Destinations
+ * underneath, so without this check queued work kept being sent for the rest of its Ladder.
+ * Native SQL because the worker maps no entity for those tables. Cached briefly per id.
  */
 @Component
 public class ProjectStatusLookup {
 
-    /** Short enough that a lifted suspension is noticed on the first Attempt after it. */
     private static final Duration CACHE_TTL = Duration.ofSeconds(30);
     private static final long MAX_CACHED = 10_000;
 
-    /**
-     * How long a Delivery or Forward of a suspended Organization is handed back for. A suspension
-     * is lifted by a person, so nothing about it is urgent to notice; what matters is that a
-     * backlog of thousands is not re-claimed every few seconds for as long as it stands. A
-     * suspension that outlasts the hard cap ends in the DLQ, where it can still be retried.
-     */
+    /** Long enough that a suspended backlog is not re-claimed every few seconds. */
     public static final Duration SUSPENSION_RECHECK = Duration.ofMinutes(5);
 
     public enum ProjectStatus {
         ACTIVE,
-        /** The Project was deleted. Nothing brings a deleted Project back. */
         DELETED,
-        /** Its Organization is suspended, which an operator can lift. */
         ORGANIZATION_SUSPENDED
     }
 
@@ -71,27 +55,23 @@ public class ProjectStatusLookup {
         this.bySource = Caffeine.newBuilder().maximumSize(MAX_CACHED).expireAfterWrite(ttl).build();
     }
 
-    /** The status of the Project an Endpoint belongs to. */
     public ProjectStatus forProject(UUID projectId) {
         return byProject.get(projectId, id -> load(BY_PROJECT, id));
     }
 
-    /** The status of the Project a Source — and so its Destinations — belongs to. */
     public ProjectStatus forSource(UUID sourceId) {
         return bySource.get(sourceId, id -> load(BY_SOURCE, id));
     }
 
     private ProjectStatus load(String sql, UUID id) {
         List<ProjectStatus> found = jdbc.query(sql, (rs, row) -> {
-            // Deleted first: a deletion is final, and deferring it until a suspension lifts
-            // would only send nothing later instead of now.
+            // Deletion wins: it is final, so there is no point deferring until a suspension lifts.
             if (rs.getBoolean("deleted")) {
                 return ProjectStatus.DELETED;
             }
             return rs.getBoolean("suspended") ? ProjectStatus.ORGANIZATION_SUSPENDED : ProjectStatus.ACTIVE;
         }, id);
-        // No row is not a deletion: the api hard-deletes nothing a live Endpoint or Source still
-        // references, and a missing parent is reported by whatever finds the child missing.
+        // No row is not a deletion: the api never hard-deletes a parent that is still referenced.
         return found.isEmpty() ? ProjectStatus.ACTIVE : found.get(0);
     }
 }

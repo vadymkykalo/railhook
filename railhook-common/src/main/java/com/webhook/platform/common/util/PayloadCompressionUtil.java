@@ -10,22 +10,12 @@ import java.util.Base64;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-/**
- * Utility for compressing/decompressing event payloads.
- * Uses gzip compression with Base64 encoding for storage compatibility.
- */
+/** Gzip then Base64, so the result fits a text column. */
 @Slf4j
 public class PayloadCompressionUtil {
 
-    private static final int DEFAULT_COMPRESSION_THRESHOLD_BYTES = 1024; // 1KB
+    private static final int DEFAULT_COMPRESSION_THRESHOLD_BYTES = 1024;
 
-    /**
-     * Compresses a JSON payload if it exceeds the threshold.
-     *
-     * @param payload JSON string to compress
-     * @param thresholdBytes compression threshold in bytes
-     * @return compressed result with metadata
-     */
     public static CompressionResult compress(String payload, int thresholdBytes) {
         if (payload == null || payload.isEmpty()) {
             return new CompressionResult(payload, false, 0, 0);
@@ -47,7 +37,6 @@ public class PayloadCompressionUtil {
             byte[] compressedBytes = byteStream.toByteArray();
             int compressedSize = compressedBytes.length;
 
-            // Only use compression if it actually reduces size
             if (compressedSize >= originalSize) {
                 log.debug("Compression ineffective: original={}, compressed={}. Storing uncompressed.",
                         originalSize, compressedSize);
@@ -67,13 +56,6 @@ public class PayloadCompressionUtil {
         }
     }
 
-    /**
-     * Decompresses a payload if it was compressed.
-     *
-     * @param payload potentially compressed payload
-     * @param isCompressed whether the payload is compressed
-     * @return decompressed JSON string
-     */
     public static String decompress(String payload, boolean isCompressed) {
         if (!isCompressed || payload == null || payload.isEmpty()) {
             return payload;
@@ -98,9 +80,6 @@ public class PayloadCompressionUtil {
         }
     }
 
-    /**
-     * Result of compression attempt.
-     */
     public record CompressionResult(
             String payload,
             boolean compressed,

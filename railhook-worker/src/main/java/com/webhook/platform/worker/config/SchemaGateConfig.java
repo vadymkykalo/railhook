@@ -10,13 +10,7 @@ import javax.sql.DataSource;
 import java.io.IOException;
 import java.time.Instant;
 
-/**
- * Makes Hibernate's schema validation wait for {@link MigratedSchemaGate} — the same mechanism
- * Spring Boot uses to run Flyway before JPA in the API.
- *
- * <p>Only where Hibernate validates. A test that lets Hibernate create the schema has nothing to
- * wait for.
- */
+// Makes Hibernate's schema validation wait for MigratedSchemaGate, the way Boot orders Flyway before JPA.
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = "spring.jpa.hibernate.ddl-auto", havingValue = "validate")
 public class SchemaGateConfig {

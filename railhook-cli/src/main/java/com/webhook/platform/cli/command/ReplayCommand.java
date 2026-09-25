@@ -88,7 +88,6 @@ public class ReplayCommand implements Callable<Integer> {
             out.println("  Time range:  " + fromDate + " → " + toDate);
             if (eventType != null) out.println("  Event type:  " + eventType);
 
-            // Poll for completion
             out.println();
             out.println("  Waiting for completion...");
             for (int i = 0; i < 60; i++) {

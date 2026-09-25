@@ -14,7 +14,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
-/** Holds everything an {@link IncomingAttemptStore} needs, so a caller supplies only the Forward. */
 @Component
 public class IncomingAttemptStoreFactory {
 

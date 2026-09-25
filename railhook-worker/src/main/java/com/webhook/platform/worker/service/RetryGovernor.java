@@ -8,23 +8,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Adaptive rate governor for retry schedulers.
- * Prevents retry storms via AIMD (Additive Increase, Multiplicative Decrease)
- * congestion control + queue-depth-based admission control.
- *
- * <p>Usage: call {@link #computeEffectiveBatch(long)} before each poll to get the
- * adaptive batch size, then call {@link #recordResult(int, int)} after the poll
- * to feed back success/failure counts.</p>
- *
- * <h3>Algorithm</h3>
- * <ol>
- *   <li><b>AIMD batch sizing</b> — on success: +increment; on failure (>50%): halve.
- *       Floor = {@code minBatch}, ceiling = {@code maxBatch}.</li>
- *   <li><b>Queue depth governor</b> — when pending count exceeds {@code highWatermark},
- *       effective batch is capped proportionally to prevent burst draining.</li>
- *   <li><b>Consecutive failure cooldown</b> — after N consecutive bad polls the governor
- *       returns 0 (skip poll) with exponential backoff up to {@code maxCooldownPolls}.</li>
- * </ol>
+ * AIMD batch sizing for a retry scheduler: add {@code increment} after a good poll, halve after
+ * one where more than half failed. Above {@code highWatermark} pending the batch is capped so a
+ * backlog drains gradually, and three bad polls in a row start an exponential cooldown.
  */
 @Slf4j
 public class RetryGovernor {
@@ -42,15 +28,6 @@ public class RetryGovernor {
     private final AtomicLong lastPendingCount = new AtomicLong(0);
     private final AtomicLong recommendedPollIntervalMs = new AtomicLong(10_000);
 
-    /**
-     * @param name            identifier for logging/metrics (e.g. "outgoing", "incoming-forward")
-     * @param maxBatch        configured maximum batch size (upper ceiling)
-     * @param minBatch        minimum batch size (floor, never below 1)
-     * @param increment       additive increase step per successful poll
-     * @param highWatermark   pending count above which admission control kicks in
-     * @param maxCooldownPolls max consecutive polls to skip on sustained failures
-     * @param meterRegistry   for publishing governor gauges
-     */
     public RetryGovernor(String name, int maxBatch, int minBatch, int increment,
                          long highWatermark, int maxCooldownPolls, MeterRegistry meterRegistry) {
         this.name = name;
@@ -73,10 +50,7 @@ public class RetryGovernor {
                 .tag("scheduler", name).register(meterRegistry);
     }
 
-    /**
-     * @param pendingCount pending retries, or -1 when unknown, which skips the depth governor
-     * @return batch size; 0 means skip this poll
-     */
+    /** Returns 0 to skip this poll. A pendingCount of -1 means unknown and skips the depth cap. */
     public int computeEffectiveBatch(long pendingCount) {
         if (pendingCount >= 0) {
             lastPendingCount.set(pendingCount);
@@ -92,7 +66,6 @@ public class RetryGovernor {
         int batch = effectiveBatch.get();
 
         if (pendingCount > highWatermark && highWatermark > 0) {
-            // At most highWatermark/10 per poll, draining over ~100 polls.
             int depthCap = Math.max(minBatch, (int) (highWatermark / 10));
             if (batch > depthCap) {
                 log.info("[{}] Queue depth governor: pending={} > highWatermark={}, capping batch {} → {}",
@@ -104,12 +77,6 @@ public class RetryGovernor {
         return batch;
     }
 
-    /**
-     * Records the outcome of a poll and adjusts the AIMD window.
-     *
-     * @param dispatched number of successfully dispatched items
-     * @param failed     number of items that failed to dispatch (Kafka send failures, timeouts)
-     */
     public void recordResult(int dispatched, int failed) {
         int total = dispatched + failed;
         if (total == 0) {
@@ -126,10 +93,7 @@ public class RetryGovernor {
             effectiveBatch.set(newBatch);
 
             int cf = consecutiveFailures.incrementAndGet();
-            // "{:.1f}" is Python, not SLF4J. SLF4J only substitutes "{}", so that token printed
-            // literally, every argument after it landed one placeholder early - the failure rate
-            // was rendered where the batch size belongs - and the last one was dropped with no
-            // warning. The line said "batch 94.44444444444444 → 18" about a batch that was 18.
+            // SLF4J only substitutes "{}"; a Python-style "{:.1f}" here once shifted every argument.
             log.warn("[{}] AIMD decrease: failureRate={}%, batch {} → {}, consecutiveFailures={}",
                     name, String.format("%.1f", failureRate * 100), current, newBatch, cf);
 
@@ -164,25 +128,22 @@ public class RetryGovernor {
     }
 
     /**
-     * Poll interval for the next cycle: aggressive under backlog, backing off when empty.
-     *
-     * <p>A multiple of the caller's configured interval, not an absolute constant. Hardcoded
-     * values here used to override {@code retry.scheduler.poll-interval-ms} from the first poll
-     * onward, so tuning the setting did nothing.
+     * A multiple of the configured interval, never an absolute value: hardcoded values once
+     * overrode {@code retry.scheduler.poll-interval-ms}, so tuning it did nothing.
      */
     public long getRecommendedPollIntervalMs(long pendingCount, long basePollIntervalMs) {
         long base = Math.max(1, basePollIntervalMs);
         long interval;
         if (pendingCount < 0) {
-            interval = base; // Unknown queue depth, use the configured interval
+            interval = base;
         } else if (pendingCount == 0) {
-            interval = base * 3; // Empty queue, back off (30s at the 10s default)
+            interval = base * 3;
         } else if (pendingCount < 100) {
-            interval = base; // Light load (10s at the 10s default)
+            interval = base;
         } else if (pendingCount < 1000) {
-            interval = Math.max(1, base / 2); // Medium load (5s at the 10s default)
+            interval = Math.max(1, base / 2);
         } else {
-            interval = Math.max(1, base / 5); // Heavy backlog, aggressive (2s at the 10s default)
+            interval = Math.max(1, base / 5);
         }
         recommendedPollIntervalMs.set(interval);
         return interval;

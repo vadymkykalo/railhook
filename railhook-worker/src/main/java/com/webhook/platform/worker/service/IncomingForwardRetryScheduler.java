@@ -76,13 +76,12 @@ public class IncomingForwardRetryScheduler {
 
     void pollPendingRetries(long pendingCount) {
         try {
-            // ── Governor: adaptive batch sizing ──
             int effectiveBatch = governor.computeEffectiveBatch(pendingCount);
             if (effectiveBatch <= 0) {
-                return; // Governor cooldown — skip this poll
+                return;
             }
 
-            // ── Phase 1: Short transaction — claim pending retries ──
+            // Phase 1: claim in a short transaction.
             List<IncomingForwardAttempt> claimed = transactionTemplate.execute(tx -> {
                 List<UUID> candidateIds = attemptRepository
                         .findPendingRetryIds(ForwardAttemptStatus.PENDING, Instant.now(), effectiveBatch, maxPerDest);
@@ -97,13 +96,7 @@ public class IncomingForwardRetryScheduler {
                     return List.<IncomingForwardAttempt>of();
                 }
 
-                // Mark as PROCESSING to prevent re-pick by another scheduler instance.
-                // started_at doubles as a fencing token: it's echoed in the Kafka
-                // message and CAS-checked by IncomingForwardService before dispatch, so a
-                // duplicate delivery of the same message can't double-POST. Truncate to
-                // microseconds -- Postgres TIMESTAMP columns default to microsecond precision,
-                // and comparing a full-nanosecond Instant against the DB-truncated value on
-                // claim would spuriously fail to match.
+                // started_at is the fencing token the consumer CAS-checks before dispatch.
                 for (IncomingForwardAttempt attempt : pendingRetries) {
                     attempt.claimForRetry();
                 }
@@ -118,7 +111,7 @@ public class IncomingForwardRetryScheduler {
 
             log.info("Claimed {} incoming forward retries for dispatch", claimed.size());
 
-            // ── Phase 2: Outside transaction — Kafka I/O ──
+            // Phase 2: Kafka I/O, outside any transaction.
             Map<UUID, CompletableFuture<SendResult<String, IncomingForwardMessage>>> futures = new HashMap<>();
 
             for (IncomingForwardAttempt attempt : claimed) {
@@ -143,7 +136,6 @@ public class IncomingForwardRetryScheduler {
                 }
             }
 
-            // Wait for all futures with timeout
             try {
                 CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0]))
                         .get(30, TimeUnit.SECONDS);
@@ -151,39 +143,27 @@ public class IncomingForwardRetryScheduler {
                 log.warn("Batch forward retry send timeout, will check individual results: {}", e.getMessage());
             }
 
-            // ── Phase 3: Short transaction — update results ──
-            // Only rows handed BACK to PENDING are written here; successfully dispatched
-            // rows are owned by the consumer from the moment the send completes.
+            // Phase 3. Only hand-backs are written. A sent row belongs to the consumer from the moment
+            // the send completes.
             int sentCount = 0;
             List<IncomingForwardAttempt> failed = new ArrayList<>();
 
             for (IncomingForwardAttempt attempt : claimed) {
                 CompletableFuture<SendResult<String, IncomingForwardMessage>> future = futures.get(attempt.getId());
                 if (future == null) {
-                    // Send was not initiated, revert to PENDING
                     failed.add(attempt);
                     continue;
                 }
 
                 try {
                     if (!future.isDone()) {
-                        // Timed out, revert to PENDING
                         failed.add(attempt);
                         continue;
                     }
-                    future.get(); // throws if failed
-                    // Status stays PROCESSING (set and committed in Phase 1) — the consumer
-                    // finalizes it once it picks up the retry message. Deliberately NOT
-                    // collected for saving: there is nothing to write, and writing it back is
-                    // actively harmful. The consumer often picks the message up within
-                    // milliseconds of the send, so by the time this sweep runs it may already
-                    // have advanced the row to a terminal state. Re-saving the Phase 1
-                    // snapshot then overwrites that result — and because
-                    // IncomingForwardAttempt carries no @Version there is no optimistic-lock
-                    // failure to notice it, so the loser is silently the consumer. It also
-                    // resets started_at, the fencing token claimRetryForProcessing depends on,
-                    // re-opening the duplicate-redelivery window that token exists to close.
-                    // Mirrors RetrySchedulerService Phase 3 on the outgoing side.
+                    future.get();
+                    // Nothing to write. The consumer may already have finalised the row, and
+                    // re-saving the Phase 1 snapshot silently overwrote that (no @Version) and
+                    // reset started_at, reopening the duplicate-redelivery window.
                     sentCount++;
                     retryScheduledCounter.increment();
 
@@ -199,7 +179,6 @@ public class IncomingForwardRetryScheduler {
 
             handBack(failed);
 
-            // ── Governor feedback ──
             governor.recordResult(sentCount, failed.size());
 
             log.info("Incoming forward retry scheduling complete: {} dispatched, {} rescheduled (governor batch={})",
@@ -211,11 +190,8 @@ public class IncomingForwardRetryScheduler {
     }
 
     /**
-     * Writes the hand-backs, each fenced on the {@code started_at} Phase 1 claimed the row under.
-     *
-     * <p>A send reported as failed or timed out may still reach the consumer, which then claims
-     * the row and may already have finalised it. Saving the Phase 1 snapshots merged PROCESSING
-     * back over that, then PENDING, and the scheduler sent the Forward again.
+     * Fenced on the Phase 1 {@code started_at}: a send reported as failed may still reach the
+     * consumer, and saving the snapshot over its result made the scheduler send the Forward again.
      */
     private void handBack(List<IncomingForwardAttempt> attempts) {
         if (attempts.isEmpty()) {

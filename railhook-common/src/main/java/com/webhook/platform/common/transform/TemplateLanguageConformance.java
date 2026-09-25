@@ -3,45 +3,13 @@ package com.webhook.platform.common.transform;
 import java.util.List;
 
 /**
- * What the transformation template language means, written down once as worked examples.
- *
- * <h2>Why this exists</h2>
- *
- * <p>The language has two implementations and they are not going to be merged into one:
- *
- * <ul>
- *   <li>{@code TemplateTransformer} in {@code railhook-api} — the preview a person reads before
- *       saving, and the workflow transform node;</li>
- *   <li>{@code PayloadTransformService} in {@code railhook-worker} — what actually reshapes a
- *       Delivery or a Forward on its way out.</li>
- * </ul>
- *
- * <p>They are duplicated deliberately, and moving the language into this module would not be the
- * small tidy-up it looks like: the two differ on purpose in what a <em>malformed</em> path does.
- * The api swallows it and substitutes null, because a preview must render something for a template
- * somebody is still typing. The worker lets it throw, because a silently nulled field in a
- * delivered, HMAC-signed body is the bug its {@code evaluateJsonPath} javadoc was written about —
- * a transformation is all-or-nothing there. Unifying them would have to pick one of those, which
- * is a change to delivery behaviour rather than a refactor.
- *
- * <p>What was missing was anything that failed when they drifted on everything <em>else</em>. This
- * is that: one corpus of template/payload/expected triples, run against each implementation by a
- * test in its own module ({@code TemplateLanguageParityTest}, in {@code railhook-api} and in
- * {@code railhook-worker}). A single test class cannot do it — the two modules are siblings in the
- * reactor and neither is on the other's classpath — so the corpus is what the two tests share.
- * Add a case here and both modules answer for it.
- *
- * <p>Expected values are JSON text and are compared as parsed trees, so key order and whitespace
- * are not part of the claim; types are.
+ * Worked examples of the template language, shared by {@code TemplateLanguageParityTest} in api
+ * and in worker. The two implementations stay separate on purpose: on a malformed path the api
+ * preview substitutes null, while the worker throws so a signed body is never silently wrong.
+ * This corpus catches drift on everything else. Expected values are compared as parsed JSON.
  */
 public final class TemplateLanguageConformance {
 
-    /**
-     * One worked example: applying {@link #template} to {@link #payload} produces
-     * {@link #expected}, in both implementations.
-     *
-     * @param name what the case is about, used as the test's display name
-     */
     public record Case(String name, String template, String payload, String expected) {
     }
 
@@ -75,11 +43,9 @@ public final class TemplateLanguageConformance {
                         "{\"a\":{}}",
                         "{\"missing\":null,\"deep\":null}"),
 
-                // Both implementations read "null" here, and both have an unreachable branch that
-                // says they meant to write the empty string: the evaluator returns a JSON null
-                // node rather than a Java null, so the `value != null ? … : ""` in each never
-                // takes its second arm. Pinned as it behaves rather than as it reads, because a
-                // receiver is parsing this string today and "fixing" it would change what they get.
+                // Both implementations mean to write "" here, but the evaluator returns a JSON null
+                // node, not a Java null, so the fallback never runs. Pinned as it behaves because
+                // receivers parse this today.
                 new Case("a path that matches nothing interpolates the text \"null\"",
                         "{\"line\":\"[${$.nope}]\"}",
                         "{\"a\":1}",

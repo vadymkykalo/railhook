@@ -11,24 +11,10 @@ import java.util.HexFormat;
 import java.util.List;
 
 /**
- * The outgoing signature scheme: {@code X-Signature: t=<millis>,v1=<hex>}, where the
- * signed payload is {@code <millis> + "." + <raw body>} under HMAC-SHA256.
- *
- * <h2>Why a header can carry more than one v1</h2>
- *
- * <p>Rotating an endpoint's secret used to be a breaking change for the receiver: from the
- * instant the new secret was generated, every delivery was signed with a key the customer
- * had not deployed yet, and each one failed their verification. So the header carries every
- * signature that is currently valid — the new secret's, and during the rotation grace window
- * the previous secret's too:
- *
- * <pre>t=1735689600000,v1=&lt;signed with the new secret&gt;,v1=&lt;signed with the previous one&gt;</pre>
- *
- * <p>A receiver accepts the delivery when <em>any</em> {@code v1} matches what it computes,
- * which is what {@link #verifySignature} does and what the Node, Python and PHP SDK helpers
- * do. A verifier written against the single-signature form still works unchanged if it scans
- * for a match rather than parsing one value — which is why the new signature is emitted
- * first.
+ * {@code X-Signature: t=<millis>,v1=<hex>}, HMAC-SHA256 over {@code <millis>.<body>}. During a
+ * secret rotation grace window the header carries a second {@code v1} for the previous secret,
+ * and a receiver accepts if any matches. The new secret's signature comes first so a verifier
+ * that reads only the first value keeps working.
  */
 public class WebhookSignatureUtils {
 
@@ -36,19 +22,14 @@ public class WebhookSignatureUtils {
     private static final long DEFAULT_TIMESTAMP_TOLERANCE_SECONDS = 300;
 
     /**
-     * Signs a body we produced ourselves, so UTF-8 is not an assumption but a fact.
-     *
-     * <p>The {@code byte[]} overload exists for the other direction: a body we <em>received</em>
-     * was signed by somebody else over the bytes they put on the wire, and those bytes are the
-     * only thing that can be re-signed to match. Decoding them to a String and encoding them
-     * back is lossy whenever the sender's charset was not UTF-8.
+     * For bodies we produced. A received body must be re-signed over its original bytes via the
+     * {@code byte[]} overload: decoding and re-encoding is lossy when the sender was not UTF-8.
      */
     public static String generateSignature(String secret, long timestamp, String body) {
         return generateSignature(secret, timestamp,
                 body != null ? body.getBytes(StandardCharsets.UTF_8) : new byte[0]);
     }
 
-    /** @param body the bytes exactly as they arrived, never a re-encoding of them. */
     public static String generateSignature(String secret, long timestamp, byte[] body) {
         try {
             byte[] prefix = (timestamp + ".").getBytes(StandardCharsets.UTF_8);
@@ -70,12 +51,6 @@ public class WebhookSignatureUtils {
         return buildSignatureHeader(secret, null, timestamp, body);
     }
 
-    /**
-     * Builds the header, adding a second {@code v1} for {@code previousSecret} when one is
-     * given — the rotation grace window. The current secret's signature always comes first.
-     *
-     * @param previousSecret the secret being retired, or {@code null} outside a grace window
-     */
     public static String buildSignatureHeader(String secret, String previousSecret, long timestamp, String body) {
         StringBuilder header = new StringBuilder("t=").append(timestamp)
                 .append(",v1=").append(generateSignature(secret, timestamp, body));
@@ -110,9 +85,7 @@ public class WebhookSignatureUtils {
                     if ("t".equals(kv[0])) {
                         timestamp = Long.parseLong(kv[1].trim());
                     } else if ("v1".equals(kv[0])) {
-                        // Every v1 is collected, not just the last: during a rotation grace
-                        // window the header carries two, and taking one of them would reject
-                        // whichever half of the pair the receiver is not holding.
+                        // Collect every v1: a rotation window carries two.
                         providedSignatures.add(kv[1].trim());
                     }
                 }
@@ -129,8 +102,7 @@ public class WebhookSignatureUtils {
             }
 
             String expectedSignature = generateSignature(secret, timestamp, body);
-            // Compared against every candidate rather than short-circuiting, so the work does
-            // not depend on which position matched.
+            // No short-circuit, so timing does not reveal which one matched.
             boolean matched = false;
             for (String provided : providedSignatures) {
                 matched |= constantTimeEquals(expectedSignature, provided);

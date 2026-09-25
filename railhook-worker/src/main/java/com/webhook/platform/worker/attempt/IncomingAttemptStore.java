@@ -31,26 +31,18 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * How the Incoming direction records its Attempts: one
- * {@code incoming_forward_attempts} row per Attempt, with the successor inserted when the
- * current one is finalised as retryable.
- *
- * <p>{@link OutgoingAttemptStore} mutates a single row in place instead. Neither model can
- * move to the other's — both are public through DTOs, dashboard pages and usage aggregation —
- * which is why this seam has two adapters.
+ * Incoming writes one {@code incoming_forward_attempts} row per Attempt and inserts the successor
+ * on a retryable finalisation. {@link OutgoingAttemptStore} mutates one row in place instead; both
+ * models are public through DTOs and the dashboard, so neither can move to the other's.
  *
  * <p>One instance per Attempt; thread-confined.
  */
 @Slf4j
 public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.Claim> {
 
-    /** What {@code delivery_attempts} keeps of a request body; Incoming keeps the same. */
     private static final int REQUEST_BODY_SNIPPET_LIMIT = 10240;
 
-    /**
-     * What a provider sends about the event rather than about its own authenticity, in the
-     * canonical case each goes out under. No signature or token belongs here.
-     */
+    /** Event metadata only, in canonical case. Never a provider signature or token. */
     private static final List<String> FORWARDED_PROVIDER_HEADERS = List.of(
             "X-GitHub-Event",
             "X-GitHub-Delivery",
@@ -68,14 +60,9 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             "X-Shopify-Triggered-At");
 
     /**
-     * Ownership of one forward attempt row.
-     *
-     * @param fence           the claim_token this attempt was claimed under, null only for a
-     *                        retry message published before the token existed
-     * @param replaySessionId the Replay this Forward belongs to, null for one created by
-     *                        ingress. Part of the Claim because it is part of the row's
-     *                        identity: (event, destination, attempt number) alone names two
-     *                        different rows once a Replay has started a second ladder.
+     * {@code fence} is null only for a retry message published before claim tokens existed.
+     * {@code replaySessionId} is part of the row's identity: once a Replay starts a second ladder,
+     * (event, destination, attempt number) alone matches two rows.
      */
     public record Claim(UUID eventId, UUID destinationId, int attemptNumber, UUID fence,
             UUID replaySessionId) {
@@ -126,11 +113,8 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     }
 
     /**
-     * Three entry paths, each claiming a row that already exists: first dispatch and replay
-     * claim a PENDING row outright; retry CASes on the token the scheduler stamped, because a
-     * redelivered Kafka message would otherwise see PROCESSING and double-POST.
-     *
-     * <p>Never returns {@link ClaimResult.Deferred}: FIFO ordering is an Outgoing concern.
+     * First dispatch and replay claim a PENDING row outright. A retry CASes on the token the
+     * scheduler stamped, because a redelivered Kafka message would otherwise double-POST.
      */
     @Override
     public ClaimResult<Claim> claim() {
@@ -139,14 +123,11 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
 
         int attemptNumber = isRetry ? message.getAttemptCount() : 1;
 
-        // Generated here, not in SQL, so the winner knows what it must still match.
         UUID claimToken = UUID.randomUUID();
 
         if (isRetry && !isReplay) {
             Instant expected = message.getStartedAt();
             if (expected == null) {
-                // Published before the fencing token existed; dropping every in-flight retry
-                // would be worse.
                 log.debug("Retry message has no fencing token (older producer?), proceeding without CAS: "
                         + "eventId={}, destId={}, attempt={}", event.getId(), destination.getId(), attemptNumber);
                 return claimed(attemptNumber, null);
@@ -158,8 +139,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 return new ClaimResult.NotClaimed<>(
                         "retry attempt already claimed by a prior delivery of this Kafka message");
             }
-            // The token this CAS just stamped, not the started_at it matched on: the latter
-            // had already been superseded, making it no fence at all.
+            // Fence on the new token, not on started_at, which this CAS just superseded.
             return claimed(attemptNumber, claimToken);
         }
 
@@ -173,28 +153,22 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     }
 
     /**
-     * Admissibility, once the Claim is held. Deliberately after it rather than before: a
-     * Destination that has been turned off is turned off for Forwards already queued or partway
-     * through the Ladder too, and failing one of those has to be written under the fencing token
-     * like every other finalisation. The enabled check used to run in IncomingForwardService
-     * before anything was claimed, so it wrote FAILED over whatever else owned the row.
+     * Admissibility checks run after the claim so that failing a Forward is written under the
+     * fencing token. Checking before the claim used to write FAILED over a row someone else owned.
      */
     private ClaimResult<Claim> claimed(int attemptNumber, UUID fence) {
         Claim claim = new Claim(event.getId(), destination.getId(), attemptNumber, fence,
                 message.getReplaySessionId());
 
         if (!Boolean.TRUE.equals(destination.getEnabled())) {
-            // The same distinction the Outgoing store makes, for the same reason: a Destination
-            // its owner turned off fails what is queued, a Destination Railhook gave up on hands
-            // it to the DLQ, where a person can retry it once the receiver works again.
+            // Turned off by its owner: fail. Auto-disabled by us: DLQ, so a person can retry.
             if (destination.getAutoDisabledAt() != null) {
                 return abandoned(claim, "Destination auto-disabled: "
                         + reasonOrDefault(destination.getAutoDisabledReason()));
             }
             return terminal(claim, "Destination is disabled");
         }
-        // Deleting a Project or suspending an Organization touches no Source or Destination under
-        // it, so both read as live here. The same two outcomes the Outgoing store gives them.
+        // Deleting a Project or suspending an Organization leaves its Destinations looking live.
         ProjectStatusLookup.ProjectStatus projectStatus =
                 projectStatusLookup.forSource(destination.getIncomingSourceId());
         if (projectStatus == ProjectStatusLookup.ProjectStatus.DELETED) {
@@ -208,8 +182,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         try {
             ladder = RetryLadder.parse(destination.getRetryDelays(), destination.getMaxAttempts());
         } catch (IllegalArgumentException e) {
-            // Retrying cannot fix a ladder that does not parse. The api rejects a malformed
-            // one on write, so reaching this means the column was written outside the api.
+            // The api rejects a malformed ladder, so this column was written outside it.
             log.error("Destination {} carries an unusable retry ladder: {}", destination.getId(), e.getMessage());
             return terminal(claim, "INVALID_RETRY_LADDER: " + e.getMessage());
         }
@@ -237,10 +210,6 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         return new ClaimResult.Claimed<>(claim, context);
     }
 
-    /**
-     * Hands the Forward back under its fencing token, unattempted, until {@link
-     * ProjectStatusLookup#SUSPENSION_RECHECK} from now.
-     */
     private ClaimResult<Claim> deferred(Claim claim, String reason) {
         Instant until = Instant.now().plus(ProjectStatusLookup.SUSPENSION_RECHECK);
         log.info("Forward eventId={}, destId={} will not be attempted before {}: {}",
@@ -249,11 +218,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         return new ClaimResult.Deferred<>(until, reason);
     }
 
-    /**
-     * Hands the Forward to the DLQ under its fencing token and reports that there is nothing to
-     * attempt. Like {@link #terminal} it never reaches {@link AttemptRunner}, so it owes the
-     * side effect itself — and only if its own finalisation applied.
-     */
+    /** Never reaches {@link AttemptRunner}, so it runs the side effect itself if finalise applied. */
     private ClaimResult<Claim> abandoned(Claim claim, String reason) {
         log.warn("Forward eventId={}, destId={} will not be attempted and goes to Failed Messages: {}",
                 claim.eventId(), claim.destinationId(), reason);
@@ -267,12 +232,10 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         return reason != null && !reason.isBlank() ? reason : "continuous failure";
     }
 
-    /** Fails the Forward under its fencing token and reports that there is nothing to attempt. */
+    /** Never reaches {@link AttemptRunner}, so it runs the release itself if finalise applied. */
     private ClaimResult<Claim> terminal(Claim claim, String reason) {
         log.warn("Forward eventId={}, destId={} will not be attempted: {}",
                 claim.eventId(), claim.destinationId(), reason);
-        // Never reaches AttemptRunner, so it owes the release itself — and only if its own
-        // finalisation applied.
         if (finalise(claim, new Finalization.TerminallyFailed(reason))) {
             onTerminallyFailed(claim);
         }
@@ -284,14 +247,11 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         String contentType = event.getContentType() != null ? event.getContentType() : "application/json";
         String idempotencyKey = event.getId() + "-" + destination.getId();
 
-        // Collected before they are applied, because the attempt row records what went out and
-        // a header handed to the request builder cannot be read back off it.
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("Content-Type", contentType);
         if (!isTransformed()) {
-            // The bytes go on unchanged, so what they are encoded with has to go with them: a gzip
-            // body arrives compressed (nothing in front of ingress decompresses a request), and
-            // without the header the Destination holds binary it cannot know how to read.
+            // Untransformed bytes are forwarded as received, e.g. still gzipped, so the encoding
+            // header must go with them.
             String contentEncoding = arrivedHeader("Content-Encoding");
             if (contentEncoding != null) {
                 headers.put("Content-Encoding", contentEncoding);
@@ -303,24 +263,17 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         }
         headers.put("X-Forward-Attempt", String.valueOf(claim.attemptNumber()));
         headers.put("Idempotency-Key", idempotencyKey);
-        // Whatever the transformation set, before the Destination's own credentials and custom
-        // headers: a script may add, not impersonate.
+        // Script headers go before credentials and custom headers: a script may add, not impersonate.
         headers.putAll(transformed.headers());
         new DestinationAuthenticator(destination, encryptionKeyRegistry, objectMapper).authenticate(headers);
         AttemptSupport.collectCustomHeaders(headers, destination.getCustomHeadersJson(), objectMapper);
-        // Last, so that everything Railhook set above — its own headers, the Destination's
-        // credentials and custom headers — keeps the name, in whatever case it was written.
+        // Last, so anything set above wins.
         forwardProviderEventHeaders(headers);
 
         return new RequestSpec(webClient, request -> headers.forEach(request::header), recorded(headers));
     }
 
-    /**
-     * The bytes the provider sent, when the Forward is not transformed and the Incoming Event kept
-     * them — which it does whenever its text copy could not reproduce them. Otherwise the text,
-     * encoded as UTF-8: for a body that was valid UTF-8 that is the same bytes, and a transformed
-     * body is text Railhook produced.
-     */
+    /** The event keeps raw bytes only when its text copy cannot reproduce them. */
     @Override
     public byte[] wireBody(Claim claim, String body) {
         if (!isTransformed() && event.getBodyBytes() != null) {
@@ -335,14 +288,10 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     }
 
     /**
-     * Adds the provider's event metadata that arrived with the Event, under its canonical name,
-     * unless a header of that name is already set. Some providers name the event only here —
-     * GitHub's push and issue bodies cannot be told apart — so without them the Destination
-     * cannot route what it receives.
-     *
-     * <p>An allowlist, never a pass-through: the provider's signatures and tokens prove the
-     * request to Railhook, not to the Destination, which Railhook authenticates to itself. A
-     * value holding a control character is dropped, so a third party cannot inject a header.
+     * Some providers name the event only in a header (GitHub push and issue bodies look alike),
+     * so the Destination needs these to route. An allowlist, not a pass-through: provider
+     * signatures prove the request to us, not to the Destination. Values with control characters
+     * are dropped to prevent header injection.
      */
     private void forwardProviderEventHeaders(Map<String, String> headers) {
         Map<String, String> arrived = arrivedHeaders();
@@ -377,15 +326,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         return null;
     }
 
-    /**
-     * The best name there is for what arrived, for a script's {@code webhook.eventType}.
-     *
-     * <p>An Incoming Event has no type of its own: Railhook did not originate it and the
-     * provider decides where it says so. Several of them say it only in a header — GitHub's
-     * push and issue bodies cannot be told apart otherwise — so the same allowlist that is
-     * forwarded to the Destination is read here, first match wins. Null when the provider named
-     * nothing, which a script has to expect.
-     */
+    /** For a script's {@code webhook.eventType}. Null when the provider sent no event header. */
     private String providerEventType() {
         Map<String, String> arrived = arrivedHeaders();
         for (String name : FORWARDED_PROVIDER_HEADERS) {
@@ -397,12 +338,10 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         return null;
     }
 
-    /** A header as the provider sent it, read back off the stored request, by name in any case. */
     private String arrivedHeader(String name) {
         return headerIgnoringCase(arrivedHeaders(), name);
     }
 
-    /** The headers the provider sent, as the stored request kept them; empty when unreadable. */
     @SuppressWarnings("unchecked")
     private Map<String, String> arrivedHeaders() {
         if (event.getHeadersJson() == null) {
@@ -418,10 +357,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         }
     }
 
-    /**
-     * What the dashboard shows for this request. The Destination's own credentials go out on
-     * every Forward, so they are masked here rather than anywhere downstream.
-     */
+    /** Masks the Destination's credentials before they reach the dashboard. */
     private String recorded(Map<String, String> headers) {
         try {
             return objectMapper.writeValueAsString(HeaderSanitizer.sanitize(headers));
@@ -432,9 +368,8 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     }
 
     /**
-     * A reusable Transformation by id, then an inline JSONPath expression, then the body
-     * unchanged. Nothing configured forwards as-is; something configured that fails to apply
-     * fails the Attempt, because transformations are how PII is stripped before relaying.
+     * A configured transformation that fails to apply fails the Attempt instead of forwarding the
+     * raw body, because transformations are how PII is stripped before relaying.
      */
     @Override
     public TransformedBody buildBody(Claim claim) {
@@ -458,8 +393,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                     .timestamp(event.getReceivedAt())
                     .direction("INCOMING")
                     .url(destination.getUrl())
-                    // The Destination's own configured headers. Its credentials are applied by
-                    // DestinationAuthenticator afterwards and are not shown here.
+                    // Credentials are added later and are never shown to the script.
                     .headers(configuredHeaders())
                     .attemptNumber(claim.attemptNumber())
                     .build());
@@ -487,12 +421,10 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         return configured;
     }
 
-    /** The attempt row already carries its own number; nothing to consume. */
     @Override
     public void attemptStarting(Claim claim) {
     }
 
-    /** Held until {@link #finalise}, which writes the response fields onto the row itself. */
     @Override
     public void recordAttempt(Claim claim, AttemptRecord record) {
         this.pendingRecord = record;
@@ -500,11 +432,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
 
     private AttemptRecord pendingRecord;
 
-    /**
-     * Writes the outcome onto the PROCESSING row, and only while it is still PROCESSING: a late
-     * writer used to overwrite a terminal row and queue a duplicate forward. Whoever got here
-     * first won.
-     */
+    /** Only while the row is still PROCESSING: a late writer used to overwrite a terminal row. */
     @Override
     public boolean finalise(Claim claim, Finalization outcome) {
         Boolean applied = transactionTemplate.execute(tx -> {
@@ -516,8 +444,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             }
 
             if (outcome instanceof Finalization.Deferred deferred) {
-                // Nothing was sent, so no attempt is consumed. next_retry_at must be set: the
-                // scheduler ignores rows without one.
+                // next_retry_at must be set: the scheduler ignores rows without one.
                 if (attempt.getStatus() != ForwardAttemptStatus.PENDING
                         && attempt.getStatus() != ForwardAttemptStatus.PROCESSING) {
                     return false;
@@ -552,7 +479,6 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             attempt.setErrorMessage(reasonFor(outcome));
             attemptRepository.save(attempt);
 
-            // Only the Attempt that actually finalised may queue a successor.
             if (outcome instanceof Finalization.Retry retry) {
                 attemptRepository.save(IncomingForwardAttempt.builder()
                         .incomingEventId(claim.eventId())
@@ -570,10 +496,8 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     }
 
     /**
-     * Whether the Claim owns the row, re-checked under the row lock. The read that found the row
-     * is a snapshot, and the write that follows is an UPDATE by id: a stuck sweep committed in
-     * between used to be overwritten, and a Retry queued a successor beside the one the sweep had
-     * already handed back.
+     * Re-checked under the row lock because the read was a snapshot. A stuck sweep that committed
+     * in between used to be overwritten, and a Retry queued a second successor.
      */
     private boolean stillHoldsClaim(Claim claim, IncomingForwardAttempt attempt, ForwardAttemptStatus... statuses) {
         if (!AttemptSupport.fenceMatches(attempt.getClaimToken(), claim.fence())) {
@@ -584,11 +508,8 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     }
 
     /**
-     * Publishes the DLQ notification for a Forward whose Retry Ladder is exhausted.
-     *
-     * <p>Outside the finalising transaction: the DLQ write is committed and this is only a
-     * notification. The topic also carries the container's poison records, so anything consuming
-     * it must tolerate both shapes; the actionable count is the DB-backed gauge.
+     * Only a notification; the DLQ state is already committed. The topic also carries the
+     * container's poison records, so consumers must tolerate both shapes.
      */
     @Override
     public void onAbandoned(Claim claim) {
@@ -609,12 +530,11 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         }
     }
 
-    /** Incoming enforces no ordering, so nothing has to be released on success. */
+    /** Incoming enforces no ordering, so nothing is released. */
     @Override
     public void onSucceeded(Claim claim) {
     }
 
-    /** Incoming's target is the Destination the Forward was made out to. */
     @Override
     public void recordTargetOutcome(Claim claim, boolean succeeded) {
         targetFailureRecorder.destinationAttempt(claim.destinationId(), succeeded);
@@ -660,7 +580,6 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             return retry.reason();
         }
         if (outcome instanceof Finalization.Abandoned abandoned) {
-            // As given: an abandon is no longer only an exhausted ladder, and the Runner says which.
             return abandoned.reason();
         }
         if (outcome instanceof Finalization.TerminallyFailed failed) {

@@ -50,25 +50,8 @@ public class PayloadTransformService {
                 .register(meterRegistry);
     }
 
-    /**
-     * Applies a transformation of either language to one Attempt's body.
-     *
-     * <p>The JavaScript half is {@link JavaScriptTransformEngine} — the same instance, with the
-     * same limits and the same sandbox, that the api runs a preview through. There is one
-     * implementation on purpose: a preview that disagreed with the delivery would be worse than
-     * no preview at all.
-     *
-     * <p>Every way a script can fail becomes a {@link PayloadTransformException}, which is what
-     * a failed template already is: retryable, and never a reason to send the raw payload
-     * instead. A script that <em>cancelled</em> is not a failure and does not throw — it comes
-     * back as {@link TransformedBody#cancelled()}, and the Runner ends the obligation.
-     *
-     * @param resolved what to apply, or a {@code Resolved} carrying no source at all, in which
-     *                 case the body goes out unchanged
-     * @param body     the body as it stands now
-     * @param context  the Event and delivery context a script sees. A template ignores it: it
-     *                 has no way to reach anything but the payload.
-     */
+    // Scripts run on the engine the api previews with, so a preview cannot disagree with the
+    // delivery. A failed script throws; a cancelled one is not a failure.
     public TransformedBody apply(TransformationCacheService.Resolved resolved, String body,
             TransformRequest context) {
         if (resolved == null || !resolved.isConfigured()) {
@@ -99,33 +82,12 @@ public class PayloadTransformService {
     }
 
     /**
-     * Transforms the event payload using the provided template.
-     * Template supports JSONPath expressions in ${...} syntax.
-     * 
-     * Example template:
-     * {
-     *   "event_id": "${$.id}",
-     *   "customer": {
-     *     "name": "${$.data.customer.name}",
-     *     "email": "${$.data.customer.email}"
-     *   },
-     *   "timestamp": "${$.created_at}"
-     * }
-     * 
-     * @param originalPayload The original event payload JSON
-     * @param template The transformation template. {@code null}/blank means "no
-     *                 transformation configured" — the original payload is fine to send.
-     * @return Transformed payload JSON string
-     * @throws PayloadTransformException if a template WAS configured (non-blank) but could
-     *         not be applied — invalid source JSON, invalid template JSON, or any other
-     *         processing failure. Callers must treat this as a failed delivery attempt
-     *         (retryable), never fall back to {@code originalPayload}: the whole point of a
-     *         configured transformation is often to strip PII before the payload leaves the
-     *         platform.
+     * A blank template means no transformation. A configured template that cannot be applied
+     * throws: callers must fail the attempt, never send the original payload, because the
+     * template is often there to strip PII.
      */
     public String transform(String originalPayload, String template) {
         if (template == null || template.isBlank()) {
-            // No transformation configured — sending the payload as-is is correct, not a bug.
             return originalPayload;
         }
 
@@ -182,11 +144,10 @@ public class PayloadTransformService {
         Matcher matcher = JSONPATH_PATTERN.matcher(text);
         
         if (matcher.matches()) {
-            // Entire value is a JSONPath expression - return the actual value
+            // A whole-value expression keeps the JSON type; an embedded one is interpolated as text.
             String jsonPath = matcher.group(1);
             return evaluateJsonPath(jsonPath, sourceNode);
         } else if (matcher.find()) {
-            // Text contains embedded JSONPath expressions - string interpolation
             matcher.reset();
             StringBuffer sb = new StringBuffer();
             while (matcher.find()) {
@@ -199,29 +160,15 @@ public class PayloadTransformService {
             matcher.appendTail(sb);
             return objectMapper.getNodeFactory().textNode(sb.toString());
         } else {
-            // Plain text - return as-is
             return objectMapper.getNodeFactory().textNode(text);
         }
     }
 
     /**
-     * Reads one {@code ${...}} expression, distinguishing "no such field" from "no such path".
-     *
-     * <p>The config carries {@code SUPPRESS_EXCEPTIONS}, so a well-formed path that matches
-     * nothing already comes back as {@code null} without throwing — an ordinary optional field,
-     * and it stays a JSON null. Anything that still throws is the path itself being malformed:
-     * a typo the author made, which no amount of retrying fixes and which the caller must see.
-     *
-     * <p>This used to catch that and substitute a null too, at DEBUG. The receiver then got a
-     * successfully delivered, successfully signed body with nulls where the data should have
-     * been, and nothing anywhere said so — contradicting both {@code AttemptStore.buildBody}'s
-     * "never return the untransformed payload" (a transformation is all-or-nothing) and
-     * {@code AttemptRunner}'s invariant 4. The case it hurt most is the one
-     * {@link #transform} names: a template whose job is to strip PII by whitelisting fields is
-     * exactly the template whose silent misfire nobody notices.
-     *
-     * <p>Note the asymmetry this removes: {@code IncomingAttemptStore} evaluates its paths with
-     * a raw {@code JsonPath.read} and has always thrown.
+     * With SUPPRESS_EXCEPTIONS a well-formed path that matches nothing returns null, which is an
+     * optional field. Anything that still throws is a malformed path and must propagate. This
+     * once swallowed it, and receivers got signed bodies with silent nulls where a PII-stripping
+     * template had misfired.
      */
     private JsonNode evaluateJsonPath(String jsonPath, JsonNode sourceNode) {
         Object result = JsonPath.using(jsonPathConfig).parse(sourceNode).read(jsonPath);
@@ -234,12 +181,6 @@ public class PayloadTransformService {
         return objectMapper.valueToTree(result);
     }
 
-    /**
-     * Validates a template by parsing it and checking for valid JSONPath expressions.
-     * 
-     * @param template The template to validate
-     * @return true if valid, false otherwise
-     */
     public boolean validateTemplate(String template) {
         if (template == null || template.isBlank()) {
             return true;

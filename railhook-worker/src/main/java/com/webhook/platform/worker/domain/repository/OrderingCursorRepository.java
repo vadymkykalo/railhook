@@ -10,15 +10,9 @@ import java.util.UUID;
 public interface OrderingCursorRepository extends JpaRepository<OrderingCursor, UUID> {
 
     /**
-     * Upserts the cursor atomically and returns the authoritative post-upsert value.
-     *
-     * <p>Unlike a WHERE-guarded upsert, this always applies {@code GREATEST} and always
-     * returns a row via {@code RETURNING} — including when {@code sequence} did not advance
-     * the cursor — so callers (see {@code OrderingBufferService#markDelivered}) can use the
-     * return value as the single source of truth to CAS the Redis cache, instead of trusting
-     * whatever (possibly stale, possibly flushed) value Redis happens to hold. {@code
-     * updated_at} only moves when the cursor itself actually advances, preserving "when this
-     * cursor was last advanced" semantics.
+     * Always returns the post-upsert cursor, even when it did not advance, so callers can CAS
+     * Redis from the database value instead of trusting a stale or flushed cache.
+     * {@code updated_at} moves only when the cursor advances.
      */
     @Query(value = """
         INSERT INTO ordering_cursors (endpoint_id, last_delivered_sequence, updated_at)

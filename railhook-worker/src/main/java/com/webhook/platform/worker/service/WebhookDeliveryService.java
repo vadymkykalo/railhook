@@ -15,13 +15,6 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * The Outgoing half of the pipeline: run an Attempt, and hand a Delivery back to the retry ladder
- * when there is no room to run one.
- *
- * <p>Everything about how an Attempt happens is behind the Runner, and everything about how the
- * Outgoing direction records one is behind its store.
- */
 @Service
 @Slf4j
 public class WebhookDeliveryService {
@@ -47,12 +40,8 @@ public class WebhookDeliveryService {
         this.transactionTemplate = transactionTemplate;
     }
 
-    /**
-     * Only reports. By the time this runs the Kafka containers have already stopped — they stop
-     * in the lifecycle phase, before any {@code @PreDestroy} — so no new record can arrive, and
-     * the in-flight ones are drained by the executor pools after this. A record polled but not
-     * acked is redelivered from the committed offset by whichever consumer takes the partition.
-     */
+    // Only reports. The Kafka containers stop in the lifecycle phase, before any @PreDestroy,
+    // and the executor pools drain what is in flight after this.
     @PreDestroy
     public void onShutdown() {
         log.info("Graceful shutdown: {} in-flight deliveries left for the executor pools to drain",
@@ -70,21 +59,8 @@ public class WebhookDeliveryService {
         }
     }
 
-    /**
-     * Called when the async executor pool is full and this record cannot even be submitted.
-     *
-     * <p>An unacked record is not redelivered until a rebalance, and since commits are deferred
-     * until every lower offset is acked, leaving it unacked stalls the whole partition rather than
-     * merely delaying it. Kafka's job for the record is done either way — the retry ladder, not
-     * redelivery, drives reprocessing — so the row is rescheduled and the caller acks.
-     *
-     * <p>Only the Claim this message would have taken is handed back. Kafka delivers a message
-     * more than once, and another copy may hold the row with its POST on the wire: taken from it,
-     * that copy's 2xx could not finalise and the ladder sent the webhook again. So a retry
-     * message hands back only while the row still carries the token it was published with, and a
-     * dispatch message only a row nobody has claimed. A retry message without a token cannot tell
-     * which copy it is, and leaves the row to the stuck sweep.
-     */
+    // Called when the pool is full. Hands back only the Claim this message would have taken:
+    // another copy may hold the row with its POST on the wire, and taking it sent the webhook twice.
     public void rescheduleForBackpressure(DeliveryMessage message, boolean isRetry) {
         UUID deliveryId = message.getDeliveryId();
         long delaySec = ThreadLocalRandom.current().nextLong(5, 16);

@@ -10,10 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 
-/**
- * Reads/writes CLI configuration from ~/.config/railhook/config.json.
- * File permissions are set to 600 (owner-only) to protect tokens.
- */
 public class CliConfigService {
 
     private static final Logger log = LoggerFactory.getLogger(CliConfigService.class);
@@ -83,7 +79,7 @@ public class CliConfigService {
         try {
             Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rw-------"));
         } catch (Exception e) {
-            // Non-POSIX system (e.g. Windows) — skip
+            // Not a POSIX file system, e.g. Windows.
         }
     }
 }

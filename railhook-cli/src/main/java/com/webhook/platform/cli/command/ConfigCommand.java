@@ -137,7 +137,6 @@ public class ConfigCommand implements Callable<Integer> {
                 out.println("Profiles:");
                 out.println("─────────────────────────────────────────");
 
-                // Always show "default" (the root-level config)
                 out.printf("  %s default  → %s%n",
                         active.equals("default") ? "*" : " ",
                         config.getBackendUrl());
@@ -172,12 +171,10 @@ public class ConfigCommand implements Callable<Integer> {
                 CliConfigService configService = new CliConfigService();
                 CliConfig config = configService.load();
 
-                // Save current state into current profile before switching
                 String currentProfile = config.getActiveProfile() != null ? config.getActiveProfile() : "default";
                 config.ensureProfiles().put(currentProfile, config.toProfile());
 
                 if (name.equals("default")) {
-                    // Switch back to default — apply from stored default profile if it exists
                     CliConfig.ProfileConfig defaultProfile = config.ensureProfiles().get("default");
                     if (defaultProfile != null) {
                         config.applyProfile(defaultProfile);
@@ -260,7 +257,6 @@ public class ConfigCommand implements Callable<Integer> {
                     return 1;
                 }
 
-                // If deleting the active profile, switch back to default
                 if (name.equals(config.getActiveProfile())) {
                     CliConfig.ProfileConfig defaultProfile = config.getProfiles().get("default");
                     if (defaultProfile != null) {

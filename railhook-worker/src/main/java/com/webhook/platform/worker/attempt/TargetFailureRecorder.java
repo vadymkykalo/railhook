@@ -12,19 +12,9 @@ import java.util.UUID;
 import java.util.function.IntSupplier;
 
 /**
- * Keeps, on the target's own row, how long it has been answering nothing but failures — the
- * memory the circuit breaker deliberately does not have.
- *
- * <p>The breaker trips in seconds and forgets in minutes, which is what makes it safe to let it
- * throttle a busy receiver. Turning an Endpoint or a Destination <em>off</em> is not a decision
- * to take on two minutes of Redis, so the run of failures goes in Postgres and the api's sweep
- * is what acts on it.
- *
- * <p>Called from both {@link AttemptStore}s, so the two directions count the same way. It is
- * the only thing in the worker that writes to {@code endpoints} or {@code incoming_destinations},
- * and it has two statements: one that extends a run, one that ends it. The second matches no
- * rows on a target that was already healthy, so a deployment whose receivers all work pays for
- * this feature with no writes at all.
+ * Records a target's run of failures in Postgres for the api's auto-disable sweep. The circuit
+ * breaker forgets in minutes, which is too short a memory for turning a target off. A healthy
+ * target costs no writes.
  */
 @Component
 @Slf4j
@@ -53,14 +43,7 @@ public class TargetFailureRecorder {
         }
     }
 
-    /**
-     * Records what one Attempt said about an Endpoint.
-     *
-     * <p>The whole feature is behind one switch, and the switch is read here rather than in the
-     * sweep so that turning it off costs nothing on the delivery path. Turning it off mid-run
-     * leaves whatever counters a target had, and turning it back on continues from there — the
-     * only behaviour that needs no backfill either way.
-     */
+    /** The feature switch is read here so that turning it off costs nothing on the delivery path. */
     public void endpointAttempt(UUID endpointId, boolean succeeded) {
         if (!enabled) {
             return;
@@ -71,7 +54,6 @@ public class TargetFailureRecorder {
                 "endpoint", endpointId);
     }
 
-    /** @see #endpointAttempt */
     public void destinationAttempt(UUID destinationId, boolean succeeded) {
         if (!enabled) {
             return;
@@ -82,10 +64,7 @@ public class TargetFailureRecorder {
                 "destination", destinationId);
     }
 
-    /**
-     * Its own transaction, not the caller's: this runs after an outcome has already been
-     * finalised, and a counter that will not increment must never roll anything back.
-     */
+    /** Own transaction: runs after finalisation, and a failed counter must not roll that back. */
     private void write(IntSupplier statement, String what, UUID id) {
         try {
             transactionTemplate.executeWithoutResult(tx -> statement.getAsInt());

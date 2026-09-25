@@ -13,14 +13,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Periodically exports queue depth gauges for deliveries and incoming forwards.
- * These metrics enable alerting on backlog growth and DLQ accumulation.
- *
- * Metrics:
- *   delivery_queue_depth{status=pending|processing|dlq}
- *   incoming_forward_queue_depth{status=pending|processing|dlq}
- */
 @Service
 @Slf4j
 public class QueueDepthMetricsExporter {

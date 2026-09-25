@@ -12,14 +12,9 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * Declares every topic the platform uses, so the worker's KafkaAdmin creates any that are missing
- * each time it starts.
- *
- * <p>kafka-init creates them once, and nothing checked again. When the broker lost its log, the
- * topics something wrote to came back by auto-creation and the DLQ topics, written only when a
- * message is abandoned, did not — the worker then failed every minute to read their depth, and an
- * abandoned message had nowhere to go. Existing topics are left as they are; KafkaAdmin only adds
- * partitions when the declared count is higher, which is why the count here is the operator's.
+ * Declared so a missing topic is recreated on every start. After a broker lost its log, the DLQ
+ * topics, written only on abandonment, never came back by auto-creation. KafkaAdmin never shrinks
+ * an existing topic, so the partition count here is the operator's.
  */
 @Configuration
 public class KafkaTopicsConfig {

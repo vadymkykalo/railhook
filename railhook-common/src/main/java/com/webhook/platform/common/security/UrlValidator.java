@@ -12,39 +12,24 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * SSRF guard for outbound webhook/forward URLs.
- *
- * <p>This is a denylist of RFC 5735/6890 special-purpose IPv4/IPv6 ranges,
- * kept as a denylist rather than inverted to an allowlist of globally-routable
- * unicast space. Considered and rejected for now: an allowlist would need to track
- * IANA's registry as new blocks get carved out of previously-reserved space (this
- * denylist only grows the other, much rarer direction — new special-purpose
- * allocations), and a webhook-delivery hot path is a risky place to introduce
- * false-positive rejections of legitimate-but-newly-routable targets. The practical
- * need an allowlist would serve — an operator knowingly forwarding to an internal
- * service — is already met by {@code WEBHOOK_ALLOW_PRIVATE_IPS} plus the per-endpoint
- * allowed-hosts list. Revisit as a dedicated follow-up if the denylist keeps needing
- * new entries.
+ * SSRF guard for outbound URLs. A denylist of special-purpose ranges rather than an allowlist of
+ * routable space: an allowlist would have to follow IANA as reserved blocks become routable, and
+ * a false rejection on the delivery path is costly. Internal targets are opted into with
+ * WEBHOOK_ALLOW_PRIVATE_IPS or the per-endpoint allowed hosts.
  */
 public class UrlValidator {
 
     private static final Set<String> ALLOWED_SCHEMES = Set.of("http", "https");
     
-    // Hard-blocked regardless of allowedHosts (see validateWebhookUrl: this check runs
-    // before the allow-list bypass) — nobody has a legitimate reason to forward a
-    // webhook to a cloud metadata endpoint.
+    // Blocked even for allowed hosts: this check runs before the allow-list bypass.
     private static final List<String> BLOCKED_HOSTS = List.of(
             "metadata.google.internal",
-            // AWS, Azure, and Oracle Cloud (OCI) all serve their instance-metadata
-            // service on this same well-known link-local address.
+            // AWS, Azure and OCI metadata.
             "169.254.169.254",
-            // Alibaba Cloud's metadata service. Also covered by the 100.64.0.0/10
-            // CGNAT range in isPrivateIPv4 below, but listed explicitly so it's
-            // blocked unconditionally rather than only when private IPs are blocked.
+            // Alibaba metadata. Also inside CGNAT, but listed so allowing private IPs does not open it.
             "100.100.100.200"
     );
 
-    // DNS resolution cache: 10min TTL, max 1000 entries
     private static final Cache<String, InetAddress[]> DNS_CACHE = Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofMinutes(10))
             .maximumSize(1000)
@@ -87,9 +72,8 @@ public class UrlValidator {
         } catch (InvalidUrlException e) {
             throw e;
         } catch (UnknownHostException e) {
-            // Its own type, because not resolving is not a verdict: a resolver timeout or a
-            // record mid-change says nothing about where the name points. A caller configuring a
-            // URL may still refuse it; a caller delivering to one has to be able to try again.
+            // Not resolving is not a verdict (resolver timeout, record mid-change). A caller
+            // delivering to the URL must be able to retry.
             throw new UnresolvableHostException("Cannot resolve host: " + e.getMessage());
         } catch (Exception e) {
             throw new InvalidUrlException("Invalid URL: " + e.getMessage());
@@ -97,19 +81,12 @@ public class UrlValidator {
     }
 
     /**
-     * The admission check's decision, made again against an address that is already connected.
+     * The same decision as {@link #validateWebhookUrl}, made against the connected peer to close the
+     * DNS rebinding window. The two must agree: they once disagreed on {@code allowedHosts} and
+     * every connection to an allow-listed host was torn down.
      *
-     * <p>{@link #validateWebhookUrl} answers this question at DNS time; the post-connect
-     * customizer has to answer the same one about the socket's real peer, which is what closes
-     * the DNS rebinding window. Both must reach the same verdict from the same inputs, or an
-     * operator's configuration is honoured by one half and silently ignored by the other — as
-     * happened with {@code allowedHosts}, where an allow-listed internal host passed admission
-     * and then had every connection to it torn down.
-     *
-     * @param host        the host as it was written, not as it resolved — the allow list is a
-     *                    list of names, and matching a resolved literal against it would let a
-     *                    rebinding answer inherit an entry meant for something else
-     * @param address     the address the connection actually reached
+     * @param host the host as written, not as resolved, so a rebinding answer cannot inherit an
+     *             allow-list entry meant for another name
      */
     public static boolean isBlockedTarget(String host, InetAddress address,
                                           boolean allowPrivateIps, List<String> allowedHosts) {
@@ -187,33 +164,26 @@ public class UrlValidator {
             return true;
         }
 
-        // 100.64.0.0/10 - Carrier-Grade NAT (RFC 6598). In-cluster pod/service traffic
-        // on EKS/GKE frequently lives here, and Alibaba Cloud's metadata service
-        // (100.100.100.200, also hard-blocked via BLOCKED_HOSTS) sits inside this range.
+        // 100.64.0.0/10 CGNAT: in-cluster traffic on EKS/GKE often lives here.
         if (firstOctet == 100 && secondOctet >= 64 && secondOctet <= 127) {
             return true;
         }
 
-        // 192.0.0.0/24 - IETF Protocol Assignments (RFC 6890): includes the DS-Lite
-        // AFTR address (192.0.0.1) and other special-purpose addressing that should
-        // never be a legitimate public webhook target.
+        // 192.0.0.0/24 IETF protocol assignments.
         if (firstOctet == 192 && secondOctet == 0 && thirdOctet == 0) {
             return true;
         }
 
-        // 198.18.0.0/15 - benchmarking address space (RFC 2544): routable-looking but
-        // reserved for network testing, not meant to be reachable in production.
+        // 198.18.0.0/15 benchmarking.
         if (firstOctet == 198 && (secondOctet == 18 || secondOctet == 19)) {
             return true;
         }
 
-        // 224.0.0.0/4 - multicast.
         if (firstOctet >= 224 && firstOctet <= 239) {
             return true;
         }
 
-        // 240.0.0.0/4 - reserved for future use, including the 255.255.255.255
-        // broadcast address.
+        // 240.0.0.0/4 reserved, including broadcast.
         if (firstOctet >= 240) {
             return true;
         }
@@ -222,50 +192,43 @@ public class UrlValidator {
     }
 
     private static boolean isPrivateIPv6(byte[] addr) {
-        // fe80::/10 - link-local.
         if (addr[0] == (byte) 0xfe && (addr[1] & 0xC0) == 0x80) {
             return true;
         }
 
-        // fc00::/7 - unique local.
         if ((addr[0] & 0xfe) == 0xfc) {
             return true;
         }
 
-        // ff00::/8 - multicast, refused for the same reason 224.0.0.0/4 is.
         if (addr[0] == (byte) 0xff) {
             return true;
         }
 
-        // ::/96 - the unspecified address, loopback, and the deprecated IPv4-compatible form.
-        // None of it is a public target, so it is refused whole rather than decoded.
+        // ::/96: unspecified, loopback and the deprecated IPv4-compatible form.
         if (allZero(addr, 0, 12)) {
             return true;
         }
 
-        // The ranges below carry an IPv4 address inside them, and whatever translates them
-        // (the host stack, a NAT64 gateway, a 6to4 relay) delivers to that address. Judging them
-        // as IPv6 would let a literal like 64:ff9b::a9fe:a9fe reach the metadata service.
+        // The ranges below embed an IPv4 address and are delivered to it, so judge that address.
+        // Otherwise 64:ff9b::a9fe:a9fe would reach the metadata service.
 
-        // ::ffff:0:0/96 - IPv4-mapped. Java folds most of these into Inet4Address on parse, but
-        // an address taken off a socket or built from bytes can still arrive in this form.
+        // IPv4-mapped. Java usually folds these into Inet4Address, but not from raw bytes.
         if (allZero(addr, 0, 10) && addr[10] == (byte) 0xff && addr[11] == (byte) 0xff) {
             return isPrivateIPv4(Arrays.copyOfRange(addr, 12, 16));
         }
 
-        // 64:ff9b::/96 - well-known NAT64 prefix.
+        // 64:ff9b::/96 NAT64.
         if (addr[0] == 0x00 && addr[1] == 0x64 && addr[2] == (byte) 0xff && addr[3] == (byte) 0x9b) {
             if (allZero(addr, 4, 12)) {
                 return isPrivateIPv4(Arrays.copyOfRange(addr, 12, 16));
             }
-            // 64:ff9b:1::/48 - local-use NAT64: translates into whatever the operator's network
-            // routes, which is exactly what this guard exists to keep out of reach.
+            // 64:ff9b:1::/48 local-use NAT64 routes into the operator's network.
             if (addr[4] == 0x00 && addr[5] == 0x01) {
                 return true;
             }
         }
 
-        // 2002::/16 - 6to4, the IPv4 address in the next 32 bits.
+        // 2002::/16 6to4.
         if (addr[0] == 0x20 && addr[1] == 0x02) {
             return isPrivateIPv4(Arrays.copyOfRange(addr, 2, 6));
         }

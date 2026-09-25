@@ -12,18 +12,11 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 
 /**
- * Talks to {@code /api/v1/admin/**} with the deployment's operator credential.
- *
- * <p>Separate from {@link HttpApiClient} on purpose, and not a flag on it. That client carries a
- * tenant's bearer token, refreshes it, and persists it to {@code ~/.railhook}; none of the three
- * is right for this credential. The operator token belongs to whoever runs the deployment, is
- * the same secret for every tenant on it, and is read from the environment or a flag each time —
- * so it is never written to a config file that a later {@code railhook status} would print.
- *
- * <p>It is also why these commands live here and not in the dashboard. The web UI is served from
- * the same origin as the API; a platform-admin token kept in a browser would turn any XSS
- * anywhere in the tenant dashboard into the deployment's master credential, which is a much
- * worse trade than typing a token into a terminal.
+ * Separate from {@link HttpApiClient}, which refreshes and persists a tenant token. The operator
+ * token is read from the environment or a flag each time and never written where
+ * {@code railhook status} would print it. These commands are not in the web UI because the UI
+ * shares the API's origin, and a token kept in a browser would turn any XSS into the master
+ * credential.
  */
 public class AdminApiClient {
 

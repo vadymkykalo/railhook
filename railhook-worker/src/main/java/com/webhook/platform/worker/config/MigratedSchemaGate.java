@@ -17,33 +17,22 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
- * Holds the worker's start until the API has migrated the schema to the release this worker was
- * built with.
- *
- * <p>Only the API runs Flyway. The worker validates its entities against the live schema when it
- * starts ({@code ddl-auto: validate}), so started beside or before an API that is still migrating
- * it exited with {@code Schema validation: missing column} and came back only on a restart — on a
- * fresh install, on {@code railhook start} after a tag change, and on a Helm upgrade, which rolls
- * both Deployments at once.
- *
- * <p>The version it waits for is the highest migration in the API module at build time; the worker
- * build copies those files into {@code db/expected-migrations}, so it cannot fall behind a new
- * migration. A schema ahead of it — an image rolled back — starts at once.
+ * Holds the worker until the API has migrated the schema: validating against a half-migrated
+ * schema exited on a missing column. The required version is the highest API migration bundled
+ * at build time; a newer schema, after a rollback, starts at once.
  */
 @Slf4j
 public class MigratedSchemaGate {
 
-    /** Where the worker build puts the API's migration files; only their names are read. */
     static final String BUNDLED_MIGRATIONS = "classpath*:db/expected-migrations/V*__*.sql";
 
-    /** Long enough for the slowest migration shipped so far on a large installation. */
+    // Long enough for the slowest migration shipped so far on a large installation.
     static final Duration TIMEOUT = Duration.ofMinutes(15);
 
     static final Duration POLL = Duration.ofSeconds(5);
 
     private static final Duration LOG_EVERY = Duration.ofSeconds(30);
 
-    /** The highest version Flyway has applied, or empty when it has applied none. */
     @FunctionalInterface
     interface AppliedVersion {
         Optional<String> highest() throws Exception;
@@ -66,7 +55,6 @@ public class MigratedSchemaGate {
         this.sleeper = sleeper;
     }
 
-    /** Returns once the schema is at the required version or beyond; throws after {@link #TIMEOUT}. */
     void await() {
         Instant started = clock.get();
         Instant deadline = started.plus(TIMEOUT);
@@ -115,7 +103,6 @@ public class MigratedSchemaGate {
         }
     }
 
-    /** The highest migration version bundled into this build. */
     static String requiredVersion(ResourcePatternResolver resolver) throws IOException {
         String highest = null;
         for (Resource resource : resolver.getResources(BUNDLED_MIGRATIONS)) {
@@ -135,7 +122,6 @@ public class MigratedSchemaGate {
         return highest;
     }
 
-    /** Reads Flyway's history table; a database the API has not migrated yet has none. */
     static AppliedVersion fromDatabase(DataSource dataSource) {
         return () -> {
             try (Connection connection = dataSource.getConnection();
@@ -151,7 +137,7 @@ public class MigratedSchemaGate {
                 }
                 return Optional.ofNullable(highest);
             } catch (SQLException e) {
-                // undefined_table: Flyway has not run against this database at all.
+            // undefined_table: Flyway has never run against this database.
                 if ("42P01".equals(e.getSQLState())) {
                     return Optional.empty();
                 }
@@ -160,7 +146,7 @@ public class MigratedSchemaGate {
         };
     }
 
-    /** Flyway's ordering: dot- or underscore-separated numbers, compared part by part. */
+    // Flyway's ordering: dot- or underscore-separated numbers, compared part by part.
     static int compareVersions(String a, String b) {
         String[] left = a.split("[._]");
         String[] right = b.split("[._]");

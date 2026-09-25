@@ -22,14 +22,7 @@ public class DeliveryAttempt {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    /**
-     * Tenant discriminator, mapped but not enforced here: the api filters on this column via
-     * {@code @TenantId}, the worker deliberately does not — it has no {@code AuthContext} and
-     * every consumer is a system path. It is mapped rather than ignored because the attempt
-     * stores have to carry the tenant across from the parent row, and because
-     * {@code EntityMappingParityIntegrationTest} requires both modules to map every column of a
-     * shared table.
-     */
+    /** Not tenant-filtered here: the worker has no request tenant. Mapped so attempt rows can copy it. */
     @Column(name = "organization_id", nullable = false)
     private UUID organizationId;
 

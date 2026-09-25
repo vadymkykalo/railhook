@@ -25,26 +25,23 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Owns what happens during one Attempt, and in what order. Both directions run this; what
- * differs is behind {@link AttemptStore}.
+ * Runs one Attempt for either direction. What differs between them is behind {@link AttemptStore}.
  *
- * <p>Six invariants, each of which was once correct on one direction and wrong on the other:
+ * <p>Invariants. Each was once broken in one direction:
  *
  * <ol>
- *   <li>No DB, Redis or Kafka work inside the reactive chain — a write there can trip the
- *       HTTP timeout and drive the failure path over a SUCCESS already written. The same rule
- *       applies after the chain: once a 2xx is in hand, nothing that goes wrong while writing
- *       it down may reclassify it as something to retry.</li>
+ *   <li>No DB, Redis or Kafka work inside the reactive chain. A write there can trip the HTTP
+ *       timeout and run the failure path over a SUCCESS already written. After the chain, a
+ *       failure to write down a 2xx must not turn it into a retry.</li>
  *   <li>No successor Attempt unless {@link AttemptStore#finalise} reports it wrote.</li>
- *   <li>Every path that takes a concurrency permit releases it, including those that throw
- *       before the request is built.</li>
+ *   <li>Every path that takes a concurrency permit releases it, including ones that throw before
+ *       the request is built.</li>
  *   <li>A failed transformation never lets the raw payload out.</li>
- *   <li>A Deferral is not an Attempt: it consumes nothing and advances no Ladder. The
- *       converse binds too — an Attempt that was really made costs a rung even when it failed
- *       before the request existed, or it retries at the same rung until the hard cap.</li>
- *   <li>Failing to read a response is never failing to deliver. The status line arrives before
- *       the body does, so once a status is in hand the outcome is decided; a body that will not
- *       buffer — or will not arrive before the timeout — costs us the body and nothing else.</li>
+ *   <li>A Deferral is not an Attempt: it consumes nothing and advances no Ladder. Conversely, an
+ *       Attempt that was really made costs a rung even if it failed before the request existed,
+ *       or it retries at the same rung until the hard cap.</li>
+ *   <li>Failing to read a response body is not failing to deliver. Once the status is in hand
+ *       the outcome is decided; a body that is too big or too slow costs only the body.</li>
  * </ol>
  */
 @Component
@@ -79,10 +76,6 @@ public class AttemptRunner {
         this.retryAfterMax = Duration.ofSeconds(Math.max(0, retryAfterMaxSeconds));
     }
 
-    /**
-     * Claim, admit, send, classify, finalise. Returns quietly when there was nothing to do —
-     * the obligation was already claimed by somebody else, or was deferred.
-     */
     public <C> void run(AttemptStore<C> store, AttemptMetrics metrics) {
         ClaimResult<C> result = store.claim();
 
@@ -93,8 +86,6 @@ public class AttemptRunner {
         } else if (result instanceof ClaimResult.Claimed<C> held) {
             attempt(store, metrics, held.claim(), held.context());
         } else {
-            // ClaimResult is sealed, so this is unreachable until a fourth outcome is added —
-            // which used to compile into an unchecked cast and fail at runtime instead.
             throw new IllegalStateException("Unhandled claim result: " + result);
         }
     }
@@ -102,14 +93,11 @@ public class AttemptRunner {
     private <C> void attempt(AttemptStore<C> store, AttemptMetrics metrics, C claim, AttemptContext ctx) {
         long startedAt = System.currentTimeMillis();
 
-        // Before admission: no number of retries resolves an address we may not talk to.
         try {
             UrlValidator.validateWebhookUrl(ctx.url(), allowPrivateIps, allowedHosts);
         } catch (UrlValidator.UnresolvableHostException e) {
-            // A name that did not resolve is not a refused address. It shared the terminal branch
-            // below, so one bad minute of DNS failed the obligation for good — outside the DLQ,
-            // where nobody is offered a retry. The lookup was an Attempt that really failed, so it
-            // costs a rung (invariant 5's converse) and takes no permit, having sent nothing.
+            // DNS failure is retryable, unlike a refused address. It used to fail the obligation
+            // for good after one bad minute of DNS. It costs a rung (invariant 5) but no permit.
             String reason = "DNS_RESOLUTION_FAILED: " + e.getMessage();
             log.warn("{}: {}", ctx.description(), reason);
             try {
@@ -132,27 +120,21 @@ public class AttemptRunner {
             return;
         }
 
-        // Everything from here holds a concurrency permit.
         String requestHeaders = null;
         String body = null;
         try {
-            // The rung is spent here, ahead of everything that can throw on the way to the wire.
-            // It used to be spent after the request was built, so a transformation that had been
-            // deleted, or an mTLS client that would not build, left the attempt number where it
-            // was: isExhausted never became true and the delivery retried at the same rung every
-            // minute until the 96h hard cap cut it off — thousands of attempt rows for one
-            // delivery nothing was ever going to send. Invariant 5's converse.
+            // Spend the rung before anything that can throw. It used to be spent after the request
+            // was built, so a deleted transformation or a broken mTLS client left the attempt
+            // number stuck: isExhausted never became true and the delivery retried every minute
+            // until the 96h hard cap, writing thousands of attempt rows. Invariant 5.
             store.attemptStarting(claim);
 
-            // Outgoing signs exactly these bytes, so the body comes before the request.
             TransformedBody transformed = store.buildBody(claim);
 
             if (transformed.cancelled()) {
-                // Deliberate, not a failure. Recorded so the Delivery shows why nothing went out
-                // — an Attempt row with no status is the only trace there would otherwise be —
-                // and terminal, because the next attempt would run the same script over the same
-                // payload and reach the same answer. Nothing touches the circuit breaker: the
-                // target was never asked.
+                // Terminal: the same script over the same payload gives the same answer. Recorded
+                // so the Delivery shows why nothing went out. The breaker is not touched because
+                // the target was never called.
                 String reason = "CANCELLED_BY_TRANSFORMATION: " + (transformed.cancelReason() == null
                         ? "no reason given" : transformed.cancelReason());
                 log.info("{}: {}", ctx.description(), reason);
@@ -170,7 +152,6 @@ public class AttemptRunner {
             Response response = send(spec, ctx, store.wireBody(claim, body));
 
             if (response == null) {
-                // Otherwise the obligation stays claimed until the stuck sweep picks it up.
                 fail(store, metrics, claim, ctx, "Empty response from " + ctx.url(),
                         requestHeaders, body, elapsed(startedAt));
                 return;
@@ -194,22 +175,8 @@ public class AttemptRunner {
     }
 
     /**
-     * The five limits. Returns true holding both concurrency permits; false having already
-     * finalised the obligation as deferred and given back whatever it took.
-     *
-     * <p>Ordered by what a refusal costs to undo, not by what it costs to discover. A
-     * concurrency permit can be handed back; a rate-limit token cannot be un-consumed. So the
-     * releasable checks run first and the consuming ones last — otherwise an attempt refused on
-     * concurrency had already spent the tenant's budget, and under concurrency pressure, which
-     * is exactly when deferrals happen, a tenant got less throughput than it was configured for
-     * with nothing to explain why.
-     *
-     * <p>The tenant cap is the one that makes this multi-tenant. The per-target cap bounds one
-     * receiver to a slice of the pool, which does nothing about an organization with twenty slow
-     * receivers: each stays inside its own slice and their sum is the entire worker, so everyone
-     * else stops being delivered to. The breaker eventually notices a slow target, but it needs
-     * a handful of calls per target to trip, and that window widens with every endpoint the
-     * tenant owns.
+     * Permits are taken before rate-limit tokens because only permits can be handed back. The
+     * tenant cap stops one organization's slow receivers from taking the whole worker.
      */
     private <C> boolean admit(AttemptStore<C> store, C claim, AttemptContext ctx) {
         if (!circuitBreaker.isCallPermitted(ctx.targetKey())) {
@@ -246,15 +213,7 @@ public class AttemptRunner {
         concurrencyControl.releaseForTenant(ctx.tenantKey());
     }
 
-    /**
-     * Ends the obligation because a Transformation said not to send it — under invariant 2, as a
-     * successor is: the release runs only if this Attempt's own finalisation applied.
-     *
-     * <p>Not {@link #terminallyFail}, and the difference is not cosmetic. It lands on the
-     * obligation as CANCELLED rather than FAILED, so the analytics that count SUCCESS against
-     * FAILED and DLQ count it as neither — which is right, because nothing reached the target and
-     * nothing went wrong.
-     */
+    /** CANCELLED, not FAILED: nothing went wrong, so analytics count it as neither. */
     private <C> void cancel(AttemptStore<C> store, C claim, AttemptContext ctx, String reason) {
         if (store.finalise(claim, new Finalization.Cancelled(reason))) {
             store.onCancelled(claim);
@@ -264,7 +223,6 @@ public class AttemptRunner {
         }
     }
 
-    /** Ends the obligation for good, releasing what it held — under invariant 2, as a successor is. */
     private <C> void terminallyFail(AttemptStore<C> store, C claim, String reason) {
         if (store.finalise(claim, new Finalization.TerminallyFailed(reason))) {
             store.onTerminallyFailed(claim);
@@ -274,10 +232,6 @@ public class AttemptRunner {
         }
     }
 
-    /**
-     * Hands the obligation to the DLQ, where a person decides about it — under invariant 2, as a
-     * successor is: the side effect runs only if this Attempt's own finalisation applied.
-     */
     private <C> void abandon(AttemptStore<C> store, C claim, AttemptContext ctx, String reason) {
         if (finaliseOrLeaveToSweep(store, claim, ctx, new Finalization.Abandoned(reason))) {
             store.onAbandoned(claim);
@@ -287,14 +241,7 @@ public class AttemptRunner {
         }
     }
 
-    /**
-     * Finalises a failure, and treats not managing to as the stuck sweep's business.
-     *
-     * <p>These run inside the catch-all that turns an exception into a failed Attempt, so a
-     * finalisation that threw re-entered {@code fail()}: the Attempt was recorded and counted
-     * against the breaker twice, and the second throw escaped the Runner. The row stays claimed
-     * either way; the sweep hands it back, and the Attempt is recorded once.
-     */
+    /** A throw is left to the stuck sweep; propagating it recorded the Attempt twice. */
     private <C> boolean finaliseOrLeaveToSweep(AttemptStore<C> store, C claim, AttemptContext ctx,
             Finalization outcome) {
         try {
@@ -319,26 +266,17 @@ public class AttemptRunner {
         return false;
     }
 
-    /**
-     * Sends {@code body} as bytes. A String handed to WebClient is encoded again on the way out,
-     * with whatever charset the Content-Type names — so a body that was not UTF-8 when it arrived
-     * left as something else. Bytes are written as they are.
-     */
+    /** Bytes, not a String: WebClient re-encodes a String with the Content-Type charset. */
     private Response send(RequestSpec spec, AttemptContext ctx, byte[] body) {
         WebClient.RequestBodySpec request = spec.client().post().uri(ctx.url());
         spec.headers().accept(request);
 
-        // Invariant 6 needs the status to outlive the chain that produced it. Reading the body
-        // can end three ways — it arrives, it is too big to buffer, or it does not arrive in
-        // time — and only the first two are visible from inside the exchange. The timeout below
-        // has to bound the whole call, so when it fires during the body read it *cancels* the
-        // inner chain rather than failing it, and no onErrorResume in there ever sees it. So
-        // the status is stashed the moment the response head lands, and read back out here.
+        // Invariant 6. A timeout during the body read cancels the inner chain instead of failing
+        // it, so no onErrorResume sees it. The status is stashed as soon as the head arrives.
         AtomicInteger statusSeen = new AtomicInteger(-1);
         AtomicReference<String> headersSeen = new AtomicReference<>("{}");
         AtomicReference<String> retryAfterSeen = new AtomicReference<>();
 
-        // Invariant 1: the mono produces the raw HTTP outcome and nothing else.
         Mono<Response> exchange = request.bodyValue(body != null ? body : new byte[0])
                 .exchangeToMono(response -> {
                     int status = response.statusCode().value();
@@ -361,11 +299,9 @@ public class AttemptRunner {
         } catch (RuntimeException e) {
             int status = statusSeen.get();
             if (status < 0) {
-                // Nothing ever came back. This one really is a failure to deliver.
                 throw e;
             }
-            // A receiver that answers 2xx and then dawdles over the body used to collect the
-            // whole ladder — one delivery, seven arrivals. The status is the outcome.
+            // A receiver that answered 2xx and then stalled on the body used to get every retry.
             log.warn("{}: HTTP {} received, but the response body did not: {}",
                     ctx.description(), status, e.getMessage());
             return unreadableBody(status, headersSeen.get(), retryAfterSeen.get(), e.getMessage());
@@ -386,9 +322,8 @@ public class AttemptRunner {
             metrics.success(status, durationMs);
             circuitBreaker.recordSuccess(ctx.targetKey(), durationMs);
             recordTargetOutcome(store, claim, ctx, true);
-            // Both writes used to sit inside the caller's catch-all, so a database that blinked
-            // while writing down a delivered webhook sent it again. The receiver has it; from
-            // here on the only question is how much of that we manage to write down.
+            // These writes used to sit inside the caller's catch-all, so a DB blip here resent
+            // a webhook the receiver already had.
             recordQuietly(store, claim, ctx, record);
             try {
                 if (store.finalise(claim, new Finalization.Succeeded())) {
@@ -405,20 +340,12 @@ public class AttemptRunner {
         recordQuietly(store, claim, ctx, record);
         recordTargetOutcome(store, claim, ctx, false);
 
-        // Which statuses are worth another Attempt is the obligation's own, carried over from
-        // its Subscription or its Destination. It used to be three literals here, which gave
-        // the same ladder to a gateway that answers 500 while it reloads and to an application
-        // that answers 500 because it has rejected the payload for good.
         if (ctx.retryableStatuses().isRetryable(status)) {
             circuitBreaker.recordFailure(ctx.targetKey(), new RuntimeException("HTTP " + status));
             retryOrAbandon(store, claim, ctx, "Retryable HTTP " + status, response.retryAfter(), status);
         } else {
-            // Abandoned, not terminally failed. A 3xx or a 4xx is an answer no further attempt
-            // changes, so the rest of the ladder is skipped — but a person can change it: a token
-            // rotated back, a deploy that finished, a URL fixed to the one it redirects to. FAILED
-            // is for what nobody can fix by retrying (a refused address, a disabled target), and
-            // Failed Messages does not list it, so a 401 or a 404 used to end where no one was
-            // offered a retry and only a Replay brought it back.
+            // Abandoned (DLQ), not FAILED: retrying will not fix a 4xx, but a person can, and
+            // FAILED obligations are not offered for retry in the UI.
             circuitBreaker.recordFailure(ctx.targetKey(), new RuntimeException("Non-retryable HTTP " + status));
             abandon(store, claim, ctx, "Non-retryable HTTP " + status);
         }
@@ -429,16 +356,11 @@ public class AttemptRunner {
         metrics.error(durationMs);
         circuitBreaker.recordFailure(ctx.targetKey(), new RuntimeException(String.valueOf(errorMessage)));
         recordQuietly(store, claim, ctx, errorRecord(requestHeaders, body, errorMessage, durationMs));
-        // An Attempt that produced no answer at all is still an Attempt the target failed.
         recordTargetOutcome(store, claim, ctx, false);
         retryOrAbandon(store, claim, ctx, errorMessage, null, -1);
     }
 
-    /**
-     * Writes down what this Attempt said about the target, and treats not managing to as what
-     * it is: invariant 1 binds here too, so a 2xx already on the wire is not reclassified
-     * because a counter would not increment.
-     */
+    /** Swallows failures (invariant 1): a counter that won't increment must not undo a 2xx. */
     private <C> void recordTargetOutcome(AttemptStore<C> store, C claim, AttemptContext ctx,
             boolean succeeded) {
         try {
@@ -449,12 +371,7 @@ public class AttemptRunner {
         }
     }
 
-    /**
-     * @param retryAfterHeader the receiver's {@code Retry-After}, or null when it sent none or
-     *                         there was no response to read one from
-     * @param statusCode       the status it arrived with, or -1 when there was no response;
-     *                         {@link RetryAfter} honours the header on 429 and 503 only
-     */
+    /** {@code statusCode} is -1 when there was no response. */
     private <C> void retryOrAbandon(AttemptStore<C> store, C claim, AttemptContext ctx, String reason,
             String retryAfterHeader, int statusCode) {
         if (ctx.ladder().isExhausted(ctx.attemptNumber())) {
@@ -464,12 +381,10 @@ public class AttemptRunner {
             return;
         }
 
-        // The Ladder decides first; the receiver may only push the result later, never sooner,
-        // and never past the clamp. Being asked to stay away is not an extra Attempt, so this
-        // runs after isExhausted rather than before it.
+        // Retry-After can only push the Ladder's time later, up to the clamp. It is not an extra
+        // Attempt, so it applies after the isExhausted check.
         Instant next = RetryAfter.nextRetryAt(ctx.ladder().nextRetryAt(ctx.attemptNumber()),
                 retryAfterHeader, statusCode, Instant.now(), retryAfterMax);
-        // Invariant 2: only the Attempt that actually finalised may queue a successor.
         if (finaliseOrLeaveToSweep(store, claim, ctx, new Finalization.Retry(next, reason))) {
             log.info("{}: attempt {} failed ({}), next at {}",
                     ctx.description(), ctx.attemptNumber(), reason, next);
@@ -479,15 +394,7 @@ public class AttemptRunner {
         }
     }
 
-    /**
-     * Writes the Attempt down, and treats not managing to as what it is.
-     *
-     * <p>Recording is observability; the finalisation is the ownership transfer. Letting a failed
-     * insert propagate put the caller's catch-all in charge of an outcome that had already
-     * happened on the wire — and, on the failure paths, re-entered {@code fail()}, which records
-     * again, throws again, and escapes the Runner entirely. The record is worth losing; the
-     * outcome is not.
-     */
+    /** Losing the record is acceptable; a propagated insert failure re-entered fail(). */
     private <C> void recordQuietly(AttemptStore<C> store, C claim, AttemptContext ctx, AttemptRecord record) {
         try {
             store.recordAttempt(claim, record);
@@ -519,11 +426,7 @@ public class AttemptRunner {
         }
     }
 
-    /**
-     * @param retryAfter the raw {@code Retry-After} value, kept apart from {@code headers}
-     *                   because that field is a sanitised JSON blob for the dashboard and this
-     *                   one has to be parsed
-     */
+    /** {@code headers} is sanitised JSON for display; {@code retryAfter} is the raw value to parse. */
     private record Response(int status, String body, String headers, String retryAfter) {
     }
 }

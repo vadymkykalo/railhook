@@ -22,13 +22,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Clock;
 
-/**
- * Holds everything an {@link OutgoingAttemptStore} needs, so a caller supplies only the message.
- *
- * <p>A store is one per Attempt and thread-confined: it holds the loaded Endpoint and Event. That
- * used to be a sentence in a javadoc with a sixteen-argument constructor behind it, fourteen of
- * whose arguments the calling service held as fields solely to pass along.
- */
 @Component
 public class OutgoingAttemptStoreFactory {
 
@@ -51,10 +44,8 @@ public class OutgoingAttemptStoreFactory {
     private final Clock clock;
 
     /**
-     * How long a Delivery blocked behind an outstanding sequence waits before it is re-polled.
-     * The fallback path only: the fast path republishes buffered Deliveries the moment the
-     * sequence ahead of them completes, but that chain is broken for a Delivery that reaches the
-     * buffer after its predecessor's trigger already fired, and nothing but this poll restarts it.
+     * Fallback re-poll for a parked Delivery. Needed when a Delivery reaches the buffer after its
+     * predecessor's trigger already fired, since nothing else will wake it.
      */
     private final int orderingBufferRescheduleDelaySeconds;
 

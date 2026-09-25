@@ -2,22 +2,14 @@ package com.webhook.platform.common.transform;
 
 import java.util.Locale;
 
-/**
- * The language a Transformation is written in.
- *
- * <p>{@link #TEMPLATE} is the original one and stays the default: a JSON document whose string
- * values may hold {@code ${$.jsonpath}} expressions. Every row that existed before this enum did
- * is a TEMPLATE, and nothing migrates them — a template that works is not a problem to be fixed.
- */
 public enum TransformationKind {
 
-    /** A JSON document with {@code ${$.jsonpath}} substitutions. Cannot loop, branch or compute. */
+    /** The original language and the default. Existing rows are never migrated. */
     TEMPLATE,
 
-    /** A JavaScript {@code handler(webhook)} run in a sandbox. See {@code JavaScriptTransformEngine}. */
     JAVASCRIPT;
 
-    /** Parses a stored value, treating anything unrecognised — including null — as TEMPLATE. */
+    /** Anything unrecognised, including null, is TEMPLATE. */
     public static TransformationKind fromStored(String value) {
         if (value == null || value.isBlank()) {
             return TEMPLATE;

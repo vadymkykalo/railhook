@@ -10,20 +10,10 @@ import org.springframework.stereotype.Component;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Runs a periodic sweep on one replica at a time.
- *
- * <p>Does not wait for the lock: a sweep another replica is already running is a sweep this one
- * does not need to run. The lease expires on its own, so a replica that dies mid-sweep does not
- * block the next one.
- *
- * <p>And does not require the lock. What the lock buys is that one replica sweeps rather than
- * several; the sweeps behind it are {@code UPDATE ... WHERE status = 'PROCESSING' AND
- * last_attempt_at &lt; threshold}, so a second replica running one concurrently finds nothing left
- * to claim. Losing that coordination costs a wasted query. Losing the sweep costs every Delivery
- * whose worker died: these are the only things that revoke a lost Claim, and a Redis outage is
- * precisely when workers are being restarted and Claims are being lost — so gating them on Redis
- * made the outage the reason the recovery from it did not happen. The breaker fails open for the
- * same reason and is counted rather than silent; so is this.
+ * Runs a sweep on one replica at a time, without waiting for the lock and without requiring it.
+ * The sweeps are conditional UPDATEs, so two replicas running at once only waste a query. They
+ * are also the only thing that revokes a lost Claim, and a Redis outage is exactly when workers
+ * restart and lose Claims, so gating them on Redis made the outage block its own recovery.
  */
 @Slf4j
 @Component
@@ -72,16 +62,11 @@ public class ExclusiveSweep {
                     lock.unlock();
                 }
             } catch (Exception e) {
-                // The lease expires on its own; a Redis failure here is not worth failing over.
                 log.debug("{}: could not release the lock: {}", what, e.getMessage());
             }
         }
     }
 
-    /**
-     * A sweep that throws must not take the scheduler's thread with it — it runs again next tick,
-     * and the exception escaping told nobody anything the log does not.
-     */
     private void runQuietly(String what, Runnable body) {
         try {
             body.run();

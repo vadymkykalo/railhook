@@ -27,17 +27,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
 /**
- * Two gauges per direction, and only one of them is alertable.
- *
- * <p>{@code webhook_dlq_depth} and {@code incoming_forward_dlq_depth} count rows still in DLQ
- * status in Postgres. They are read from the same column retry and purge mutate, so they return
- * to zero once the backlog is worked through. These are the ones that should page someone.
- *
- * <p>{@code webhook_dlq_topic_retained_total} and {@code incoming_forward_dlq_topic_retained_total}
- * count records still held by the Kafka topics. Nothing consumes those topics, so a record stays
- * counted for the whole retention window however thoroughly the obligation was remediated. They
- * must never drive an alert — as the single Kafka-derived gauge that preceded this split did,
- * firing every cycle forever.
+ * The {@code *_dlq_depth} gauges count rows in DLQ status in Postgres and return to zero once the
+ * backlog is worked through; alert on those. The {@code *_dlq_topic_retained_total} gauges count
+ * records the Kafka topics still retain, which nothing consumes, so they stay up for the whole
+ * retention window. Never alert on them: the Kafka-based gauge they replaced fired forever.
  */
 @Service
 @Slf4j
@@ -98,10 +91,8 @@ public class DlqMonitoringService {
 
     @Scheduled(fixedDelayString = "${dlq.monitoring.interval-ms:60000}")
     public void monitorDlqDepth() {
-        // Independent try/catches all the way down: a DB outage must not suppress the
-        // Kafka-side signals, a broker outage must not suppress the actionable (DB-backed)
-        // ones, and neither direction may suppress the other -- an Incoming backlog is
-        // exactly as invisible as an Outgoing one if one failing query silently ends the poll.
+        // Separate try/catches: a DB outage must not hide the Kafka numbers, a broker outage the
+        // DB ones, or one direction's failure the other's backlog.
         refreshActionableDepth("Deliveries", deliveryRepository::countDlqTotal, actionableDlqDepth);
         refreshActionableDepth("Forwards", incomingForwardAttemptRepository::countDlqTotal, incomingActionableDlqDepth);
         refreshTopicRetainedDepth(KafkaTopics.DELIVERIES_DLQ, topicRetainedDepth);
@@ -125,9 +116,7 @@ public class DlqMonitoringService {
 
     private void refreshTopicRetainedDepth(String topic, AtomicLong gaugeValue) {
         try {
-            // Discover all partitions dynamically. Bounded .get() - an unbounded call here sat
-            // on a scheduler thread indefinitely if the broker was slow/unreachable, starving
-            // every other @Scheduled job sharing the pool.
+            // Bounded get(): an unbounded one blocked a shared scheduler thread on a slow broker.
             TopicDescription description = adminClient
                     .describeTopics(Collections.singletonList(topic))
                     .topicNameValues()
@@ -136,7 +125,6 @@ public class DlqMonitoringService {
 
             List<TopicPartitionInfo> partitions = description.partitions();
 
-            // Build offset requests for all partitions
             Map<TopicPartition, OffsetSpec> latestRequest = new HashMap<>();
             Map<TopicPartition, OffsetSpec> earliestRequest = new HashMap<>();
             for (TopicPartitionInfo partitionInfo : partitions) {
@@ -145,15 +133,11 @@ public class DlqMonitoringService {
                 earliestRequest.put(tp, OffsetSpec.earliest());
             }
 
-            // Query latest and earliest offsets for all partitions
             Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> latestOffsets = adminClient
                     .listOffsets(latestRequest).all().get(adminClientTimeoutSeconds, TimeUnit.SECONDS);
             Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> earliestOffsets = adminClient
                     .listOffsets(earliestRequest).all().get(adminClientTimeoutSeconds, TimeUnit.SECONDS);
 
-            // Compute retained volume per partition: latest - earliest. This is retention
-            // volume, not backlog -- see the class Javadoc. It never drives the "manual
-            // intervention" warning.
             long totalMessages = 0;
             for (TopicPartitionInfo partitionInfo : partitions) {
                 TopicPartition tp = new TopicPartition(topic, partitionInfo.partition());

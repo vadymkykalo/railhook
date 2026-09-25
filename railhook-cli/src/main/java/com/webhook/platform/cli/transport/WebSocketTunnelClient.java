@@ -22,24 +22,19 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-/**
- * WebSocket client that maintains a persistent connection to the backend tunnel endpoint.
- * Receives forwarded HTTP requests and sends back responses after local forwarding.
- */
 public class WebSocketTunnelClient {
 
     private static final Logger log = LoggerFactory.getLogger(WebSocketTunnelClient.class);
     private static final int HEARTBEAT_INTERVAL_SECONDS = 30;
-    // What this CLI accepts. A binary request body arrives both as a string and as base64.
+    // A binary request body arrives both as a string and as base64, hence the larger local limit.
     private static final int MAX_MESSAGE_SIZE = 4 * 1024 * 1024;
-    // What the server accepts: TunnelWebSocketHandler's limit, the same in every version so far.
+    // The server's limit, unchanged in every version so far.
     static final int SERVER_MAX_MESSAGE_CHARS = 1024 * 1024;
 
-    // Exponential backoff config
-    private static final long BASE_DELAY_MS = 1_000;      // 1s initial
-    private static final long MAX_DELAY_MS  = 120_000;     // 2min cap
-    private static final int  MAX_RECONNECT_ATTEMPTS = 50; // generous limit with exp backoff
-    private static final double JITTER_FACTOR = 0.5;       // ±50% randomization
+    private static final long BASE_DELAY_MS = 1_000;
+    private static final long MAX_DELAY_MS  = 120_000;
+    private static final int  MAX_RECONNECT_ATTEMPTS = 50;
+    private static final double JITTER_FACTOR = 0.5;
 
     private final String wsUrl;
     private final String tunnelToken;
@@ -117,11 +112,8 @@ public class WebSocketTunnelClient {
     }
 
     /**
-     * The response as it goes on the socket — or, when it would not fit in one server message,
-     * a 502 saying so. Every server version closes the socket over a message larger than
-     * {@link #SERVER_MAX_MESSAGE_CHARS}, which ended the tunnel instead of failing one request.
-     * A binary body now travels twice — as the string an older server reads and as base64 — so
-     * that ceiling is nearer than it was.
+     * Every server version closes the socket on a message over {@link #SERVER_MAX_MESSAGE_CHARS},
+     * which ended the tunnel instead of failing one request, so an oversized response becomes a 502.
      */
     static String responseJson(ObjectMapper objectMapper, TunnelResponseMessage response) throws IOException {
         String json = objectMapper.writeValueAsString(TunnelMessage.tunnelResponse(response));
@@ -148,8 +140,7 @@ public class WebSocketTunnelClient {
             WebSocketContainer container = ContainerProvider.getWebSocketContainer();
             container.setDefaultMaxTextMessageBufferSize(MAX_MESSAGE_SIZE);
 
-            // Pass token via Sec-WebSocket-Protocol header (not query param)
-            // to avoid leaking it in server access logs and proxy logs
+            // Token in Sec-WebSocket-Protocol, not the query string, so access logs never see it.
             ClientEndpointConfig endpointConfig = ClientEndpointConfig.Builder.create()
                     .preferredSubprotocols(List.of("tunnel-token." + tunnelToken))
                     .build();
@@ -173,7 +164,6 @@ public class WebSocketTunnelClient {
                     if (onDisconnected != null) onDisconnected.run();
 
                     if (running.get()) {
-                        // Don't retry on auth/policy failures
                         int code = closeReason.getCloseCode().getCode();
                         if (code == CloseReason.CloseCodes.VIOLATED_POLICY.getCode()
                                 || code == CloseReason.CloseCodes.CANNOT_ACCEPT.getCode()) {
@@ -277,9 +267,7 @@ public class WebSocketTunnelClient {
         scheduler.schedule(this::doConnect, delayMs, TimeUnit.MILLISECONDS);
     }
 
-    /**
-     * Exponential backoff with jitter: base * 2^(attempt-1), capped, then randomized ±50%.
-     */
+    // base * 2^(attempt-1), capped, then randomized by +/-50%.
     long computeBackoffMs(int attempt) {
         long exponential = BASE_DELAY_MS * (1L << Math.min(attempt - 1, 20));
         long capped = Math.min(exponential, MAX_DELAY_MS);
