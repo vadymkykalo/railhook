@@ -2,9 +2,9 @@
 title: Customer portal
 description: Embed a page in your product where your own users register endpoints, choose event types, see their deliveries and retry the failed ones.
 ---
-import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-The customer portal is a page you embed in your own product. On it, each of your users registers their own endpoints, chooses which event types they receive, sees every delivery to those endpoints with each attempt's request and response, and retries the ones that failed. It takes webhook support out of your inbox: "why didn't we get the webhook?" is answered on the page, by the person asking.
+The customer portal is a page you embed in your product. On it, each of your users registers their own endpoints, chooses the event types they receive, sees every delivery with each attempt's request and response, and retries the failed ones.
 
 Railhook calls each of your users a **Consumer**. A Consumer groups the endpoints registered for that user, and a **portal session** is a short-lived credential that lets the portal act for exactly one Consumer.
 
@@ -194,7 +194,7 @@ A Consumer can:
 A Consumer cannot:
 
 - see or touch another Consumer's endpoints or deliveries, or the project's own endpoints;
-- set a rate limit, an IP allow-list, mTLS or the signature scheme — those stay your decisions;
+- set a rate limit, an IP allow-list, mTLS or the signature scheme (those stay your decisions);
 - reach anything outside `/api/v1/portal/`. The session's token authenticates nothing else, and a dashboard login or an API key is refused on the portal's routes.
 
 When your project declares its event types in the [schema registry](/docs/outgoing/schema-registry/), the portal offers those and accepts no others; a pattern such as `order.*` is accepted when it matches a declared type. Without any declared, it offers the types the project sent in the last 7 days and the ones its endpoints already subscribe to.
@@ -205,16 +205,8 @@ Endpoints a Consumer creates count against your plan's endpoint limit for the pr
 
 - **The token.** 32 random bytes behind an `rhp_` prefix, returned once and stored only as its SHA-256 hash, as an API key is.
 - **Lifetime.** 1 minute to 24 hours. An expired session gets `401`, and the portal shows that the session has ended. Open a new one.
-- **Revoking.** `DELETE /api/v1/projects/{projectId}/consumers/{consumerId}/portal-sessions` ends every open session of a Consumer at once — the thing to do when a token may have leaked. Deleting the Consumer ends its sessions too, and deletes its endpoints so nothing goes on delivering to a user who is gone.
+- **Revoking.** `DELETE /api/v1/projects/{projectId}/consumers/{consumerId}/portal-sessions` ends every open session of a Consumer at once. Do this when a token may have leaked. Deleting the Consumer ends its sessions too, and deletes its endpoints so nothing goes on delivering to a user who is gone.
 - **Where it can be embedded.** `allowedOrigin` is an `https://` origin, or `http://localhost` or `http://127.0.0.1` with any port while you develop. With it, the portal page is served with `Content-Security-Policy: frame-ancestors <that origin>`, so the browser refuses to render it inside any other page, and the portal refuses to render when the origin in its URL does not match the session's. Without it, any `https://` page, and `http://localhost`, can embed the portal. Every other page Railhook serves refuses to be framed by any other site.
 - **Rate limit.** Portal requests are limited per session, so a script looping over one token spends its own budget and not your dashboard's.
 
 The portal's endpoints are listed under **Portal**, and the ones your backend calls under **Consumers**, in the [API reference](/docs/api-reference/).
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Endpoints and subscriptions" href="/docs/outgoing/endpoints-subscriptions/" description="What a Consumer registers, and how event types match." />
-  <LinkCard title="Retries and failed messages" href="/docs/outgoing/retries/" description="The ladder a retried delivery walks again." />
-  <LinkCard title="API reference" href="/docs/api-reference/" description="Every Consumers and Portal request and response." />
-</CardGrid>

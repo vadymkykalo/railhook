@@ -2,9 +2,9 @@
 title: Railhook чи Convoy — альтернатива Convoy під ліцензією MIT
 description: Шукаєте альтернативу Convoy? Railhook надсилає й приймає вебхуки під ліцензією MIT, а на власному сервері має всі функції без ліцензійного ключа.
 ---
-import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 
-Ця сторінка допоможе вибрати між Convoy і Railhook. Обидва продукти надсилають вебхуки вашим клієнтам і приймають вебхуки від провайдерів; найбільше вони різняться ліцензією і тим, що входить у версію для власного сервера.
+Обидва продукти надсилають вебхуки вашим клієнтам і приймають вебхуки від провайдерів. Найбільше вони різняться ліцензією і тим, що входить у версію для власного сервера.
 
 <Aside title="Перевірено 18.09.2026">
 Відомості про Convoy узято з [getconvoy.io/pricing](https://www.getconvoy.io/pricing) і [github.com/frain-dev/convoy](https://github.com/frain-dev/convoy) станом на 18 вересня 2026 р. Продукти змінюються: перевірте все самі, перш ніж ухвалювати рішення, а якщо щось тут застаріло, надішліть виправлення через pull request.
@@ -24,8 +24,6 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 | OpenTelemetry | Ні | У платних версіях |
 | Керування доступом за ролями | Три фіксовані ролі, у кожній версії | У платних версіях |
 
-Прочерк означає, що з перевірених сторінок Convoy це однозначно не випливає. Це не твердження, що такої функції немає.
-
 ## Коли краще обрати Convoy
 
 - **Вам потрібні трейси, і платна версія вас влаштовує.** Convoy підтримує OpenTelemetry. Railhook віддає метрики Prometheus, а трейсів не має.
@@ -41,11 +39,3 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 ## Перехід з Convoy
 
 Поняття Convoy переносяться майже один до одного: проєкт лишається проєктом, ендпоінт — ендпоінтом, підписка — підпискою, подія — подією, а джерело — джерелом. Railhook підписує вебхуки заголовками Standard Webhooks, тож перш ніж перемикати приймачі, з'ясуйте, які підписи вони перевіряють. У розділі [Перехід на Railhook](/docs/uk/resources/migrating/) є відповідність понять і план переходу, поки працюють обидві платформи.
-
-## Що далі
-
-<CardGrid>
-  <LinkCard title="Перехід на Railhook" href="/docs/uk/resources/migrating/" description="Відповідність понять і перехід, поки працюють обидві платформи." />
-  <LinkCard title="Організації та ролі" href="/docs/uk/platform/organizations-rbac/" description="Що можуть три ролі Railhook." />
-  <LinkCard title="Порівняння Railhook з альтернативами" href="/docs/uk/resources/comparison/" description="Railhook поруч з усіма альтернативами — разом із прогалинами." />
-</CardGrid>

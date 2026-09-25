@@ -1,16 +1,16 @@
 ---
 title: Receive Slack events reliably
-description: Answer Slack's Events API within three seconds every time — Railhook verifies X-Slack-Signature, handles the url_verification challenge, and forwards events to your service with retries and replay.
+description: Answer Slack's Events API within three seconds. Railhook verifies X-Slack-Signature, handles the url_verification challenge, and forwards events to your service with retries and replay.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
-This guide puts Railhook between Slack's Events API and your app. Slack sends its events to a Railhook source, which verifies the signature, stores each event as it arrived and forwards it to your service with retries. Slack only ever talks to Railhook, which answers straight away, so a slow handler no longer gets your event subscriptions disabled.
+Slack sends Events API events to a Railhook source. The source verifies the signature, stores each event as it arrived and forwards it to your service with retries. Railhook answers Slack straight away, so a slow handler no longer gets your event subscriptions disabled.
 
 ## Why Slack events need a buffer
 
 Slack asks your app to answer each event with a `2xx` within three seconds. It retries a failed event three times, nearly immediately, after 1 minute and after 5 minutes, marking each retry with an `x-slack-retry-num` header. If your app fails to answer at least 5% of events within 60 minutes, Slack temporarily disables its event subscriptions and emails the app's owner. ([Slack: The Events API](https://docs.slack.dev/apis/events-api/))
 
-Three seconds is tight for any handler that calls a database or another API, and a retry window of about five minutes does not cover a deploy that goes wrong. With Railhook in front:
+A retry window of about five minutes does not cover a deploy that goes wrong. With Railhook in front:
 
 - Slack is answered as soon as the event is stored, well inside the three seconds.
 - Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour, and what still fails lands in **Failed Forwards**.
@@ -22,7 +22,7 @@ The ingress answers `202` with a small JSON body of its own. Use a source for th
 
 ## Connect Slack
 
-You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
+You need a Railhook project and an API key. The same steps are available under **Incoming** in the dashboard.
 
 ```bash
 export RAILHOOK_URL=https://railhook.io   # or your own instance
@@ -86,7 +86,7 @@ The body exactly as Slack sent it, byte for byte, with its `Content-Type`. `X-Sl
 
 ## Replay after an outage
 
-Replay what arrived while your service was down. Each replayed event goes to every destination of the source as a new forward:
+Each replayed event goes to every destination of the source as a new forward:
 
 ```bash
 curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
@@ -96,11 +96,3 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-rep
 ```
 
 Replay reaches back as far as events are kept: 7 days on Railhook Cloud, and whatever you configure when self-hosting. Keep your handler idempotent on `event_id`, since a replay can send events your service already processed. See [Replay](/docs/outgoing/replay/#replay-incoming-webhooks).
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Sources" href="/docs/incoming/sources/" description="What the ingress answers, including the Slack handshake." />
-  <LinkCard title="Verification" href="/docs/incoming/verification/" description="Every provider's signature scheme, and replay protection." />
-  <LinkCard title="CLI" href="/docs/tools/cli/" description="Tunnels, events and replays from the terminal." />
-</CardGrid>

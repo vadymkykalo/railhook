@@ -1,10 +1,10 @@
 ---
 title: Вирішення проблем
-description: "Проблеми, з якими справді стикаються інсталяції на власних серверах: що їх спричиняє і як їх виправити."
+description: Типові проблеми інсталяцій на власному сервері, їхні причини та виправлення.
 ---
-import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 
-Почніть із цих команд у каталозі встановлення:
+У каталозі встановлення:
 
 ```bash
 ./railhook doctor        # machine and configuration checks
@@ -18,7 +18,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 |---|---|---|
 | `Port 80 is already in use` | Порт зайнятий іншим сервісом | Зупиніть його або встановіть із `--port 8080`. З `--domain` мають бути вільні і 80, і 443. Якщо їх тримає ваш власний зворотний проксі, додайте `--behind-proxy` |
 | `Docker is installed but the daemon is not reachable` | Демон зупинено або ваш користувач не в групі `docker` | Запустіть Docker або виконайте `sudo usermod -aG docker $USER && newgrp docker` |
-| Інсталятор зупиняється через RAM | Менше ніж 2 ГіБ пам'яті | Потрібен хост із більшим обсягом пам'яті. Комфортно — близько 4 ГіБ |
+| Інсталятор зупиняється через RAM | Менше ніж 2 ГіБ пам'яті | Потрібен більший хост. Комфортно близько 4 ГіБ |
 | `Could not reach the GitHub API` | Немає доступу до `api.github.com` | Вкажіть реліз явно: `--version v2.16.6` |
 | `exists and is not empty` | У цільовому каталозі є інші файли | Вкажіть інший каталог через `--dir` або продовжте з `--yes` |
 | `It did not come up within 10 minutes` | Один із сервісів не зміг запуститися під час першого старту | `./railhook logs` покаже, який саме |
@@ -39,21 +39,14 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 | Посилання в листах ведуть на `localhost` | `APP_BASE_URL` не змінено | Задайте в ній публічний URL |
 | Ingress-адреси джерел або адреси тунелів показують `localhost` | `APP_BASE_URL` (або `TUNNEL_INGRESS_BASE_URL`) досі вказує на localhost | Задайте публічний URL у `.env`, потім виконайте `./railhook start` |
 | Доставки на внутрішній сервіс не проходять | Приватні та внутрішні адреси типово заблоковано | Додайте назву хоста до `WEBHOOK_ALLOWED_HOSTS` |
-| «Too many failed sign-in attempts» | Після повторних невдалих спроб обліковий запис заблоковано | Зачекайте (60 секунд; щоразу час подвоюється, аж до 15 хвилин) або скиньте пароль — це одразу знімає блокування |
+| «Too many failed sign-in attempts» | Після повторних невдалих спроб обліковий запис заблоковано | Зачекайте (60 секунд, щоразу вдвічі довше, до 15 хвилин) або скиньте пароль, що одразу знімає блокування |
 | `502` близько 20 секунд під час оновлення | Контейнер API замінюється новим | Задайте `API_REPLICAS=2` |
 | `docker logs webhook-api` нічого не знаходить | Починаючи з 2.16.0, API не має фіксованої назви контейнера | Використовуйте `docker compose logs api` |
 
 <Aside type="tip">
-Після відновлення інстансу, а також поки він відновлюється, серія повідомлень `delivery already claimed or not PENDING` у логах воркера — очікувана річ. Воркер відхиляє застарілі повідомлення Kafka, і саме так і має бути.
+Після відновлення серія `delivery already claimed or not PENDING` у лозі воркера очікувана: воркер відхиляє застарілі повідомлення Kafka.
 </Aside>
 
 ## Досі не працює
 
-Створіть issue на [github.com/vadymkykalo/railhook/issues](https://github.com/vadymkykalo/railhook/issues) з виводом `./railhook doctor` і відповідними рядками логів. Спершу приберіть із них секрети.
-
-## Що далі
-
-<CardGrid>
-  <LinkCard title="Конфігурація" description="Що визначає кожне налаштування." href="/docs/uk/self-hosting/configuration/" />
-  <LinkCard title="Моніторинг" description="Помічайте проблеми раніше, ніж про них повідомлять користувачі." href="/docs/uk/self-hosting/monitoring/" />
-</CardGrid>
+Створіть issue на [github.com/vadymkykalo/railhook/issues](https://github.com/vadymkykalo/railhook/issues) з виводом `./railhook doctor` і відповідними рядками логів, без секретів.

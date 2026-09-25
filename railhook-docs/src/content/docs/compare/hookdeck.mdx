@@ -2,9 +2,9 @@
 title: Railhook vs Hookdeck — open-source Hookdeck alternative
 description: Looking for a Hookdeck alternative you can self-host? Railhook receives and sends webhooks under the MIT licence, where Hookdeck's receiving gateway is SaaS only.
 ---
-import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 
-Use this page to decide between Hookdeck and Railhook. Hookdeck is two products: Event Gateway for receiving webhooks and Outpost for sending them. Railhook does both in one product, and this page compares it with each half.
+Hookdeck is two products: Event Gateway for receiving webhooks and Outpost for sending them. Railhook does both in one product, so it is compared with each half.
 
 <Aside title="Verified 2026-09-18">
 Hookdeck details come from [hookdeck.com/pricing](https://hookdeck.com/pricing) and [github.com/hookdeck/outpost](https://github.com/hookdeck/outpost) as they read on 18 September 2026. Products change: check them before you decide, and send a correction as a pull request if something here is out of date.
@@ -41,11 +41,3 @@ A dash means the pages we checked did not settle the point, or it does not apply
 ## Moving from Hookdeck
 
 An Event Gateway source becomes a Railhook source, and its destinations become the source's destinations. An Outpost destination becomes a Railhook endpoint. Create the Railhook source and its destinations first, send a test webhook to the ingress URL, then change the provider's webhook URL to it. [Migrate to Railhook](/docs/resources/migrating/) has the full mapping.
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Migrate to Railhook" href="/docs/resources/migrating/" description="Concept mapping and a migration with both platforms live." />
-  <LinkCard title="Receive your first webhook" href="/docs/start/receive-first-webhook/" description="Create a source and forward to a destination." />
-  <LinkCard title="How Railhook compares" href="/docs/resources/comparison/" description="Railhook next to every alternative, gaps included." />
-</CardGrid>

@@ -1,16 +1,16 @@
 ---
 title: Receive GitHub webhooks reliably
-description: GitHub never retries a failed webhook delivery. Put Railhook in front of your app to verify X-Hub-Signature-256, retry forwards to your service, and replay after an outage.
+description: GitHub never retries a failed webhook delivery. Verify X-Hub-Signature-256 in Railhook, retry forwards to your service, and replay after an outage.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps } from '@astrojs/starlight/components';
 
-This guide puts Railhook between GitHub and your application. GitHub sends its webhooks to a Railhook source, which verifies the signature, stores each delivery as it arrived and forwards it to your service with retries. When your service is down, the webhooks wait in Railhook instead of being lost.
+GitHub sends its webhooks to a Railhook source. The source verifies the signature, stores each delivery as it arrived and forwards it to your service with retries. While your service is down, the webhooks wait in Railhook.
 
 ## Why GitHub webhooks need a buffer
 
-GitHub states that it does not automatically redeliver failed webhook deliveries. You can redeliver them by hand or through the API, but only deliveries from the past 3 days. ([GitHub: Handling failed webhook deliveries](https://docs.github.com/en/webhooks/using-webhooks/handling-failed-webhook-deliveries), [Redelivering webhooks](https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/redelivering-webhooks)) GitHub also asks your server to answer with a `2xx` within 10 seconds. ([Best practices for using webhooks](https://docs.github.com/en/webhooks/using-webhooks/best-practices-for-using-webhooks))
+GitHub does not redeliver failed webhook deliveries automatically. You can redeliver them by hand or through the API, but only from the past 3 days. ([GitHub: Handling failed webhook deliveries](https://docs.github.com/en/webhooks/using-webhooks/handling-failed-webhook-deliveries), [Redelivering webhooks](https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/redelivering-webhooks)) Your server must answer `2xx` within 10 seconds. ([Best practices for using webhooks](https://docs.github.com/en/webhooks/using-webhooks/best-practices-for-using-webhooks))
 
-So one deploy, one crash or one slow handler at the wrong moment, and that push, pull request or issue event is gone unless someone notices. With Railhook in front:
+A deploy, a crash or a slow handler at the wrong moment loses that push, pull request or issue event. With Railhook in front:
 
 - Railhook answers GitHub as soon as the delivery is stored, well inside the 10 seconds.
 - Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour.
@@ -19,7 +19,7 @@ So one deploy, one crash or one slow handler at the wrong moment, and that push,
 
 ## Connect GitHub
 
-You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
+You need a Railhook project and an API key. The same steps are available under **Incoming** in the dashboard.
 
 ```bash
 export RAILHOOK_URL=https://railhook.io   # or your own instance
@@ -81,13 +81,13 @@ The body exactly as GitHub sent it, byte for byte. Because a push and an issue c
 
 2. Add a second destination to the source with the printed public URL and your route appended, such as `https://<host>/tunnel/<slug>/webhooks/github`. It reaches `http://localhost:3000/webhooks/github`.
 
-3. Push a commit, or replay the stored `ping` from Railhook (a redelivery from GitHub carries the same `X-GitHub-Delivery`, so Railhook answers it with the stored copy and does not forward it again). The verified webhook arrives in your local app with its `X-GitHub-Event` header. Disable that destination when you stop the tunnel.
+3. Push a commit, or replay the stored `ping` from Railhook. A redelivery from GitHub will not work here: it carries the same `X-GitHub-Delivery`, so Railhook answers it with the stored copy and does not forward it. The verified webhook arrives in your local app with its `X-GitHub-Event` header. Disable that destination when you stop the tunnel.
 
 </Steps>
 
 ## Replay after an outage
 
-Replay what arrived while your service was down. Each replayed delivery goes to every destination of the source as a new forward:
+Each replayed delivery goes to every destination of the source as a new forward:
 
 ```bash
 curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
@@ -96,12 +96,4 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-rep
   -d '{"sourceId":"'"$SOURCE_ID"'","from":"2026-09-18T10:00:00Z","to":"2026-09-18T14:00:00Z","verified":true}'
 ```
 
-Unlike GitHub's own redelivery, this is not limited to 3 days: it reaches back as far as events are kept, 7 days on Railhook Cloud and whatever you configure when self-hosting. Make your handler idempotent on `X-GitHub-Delivery`, since a replay can send deliveries your service already processed. See [Replay](/docs/outgoing/replay/#replay-incoming-webhooks).
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Verification" href="/docs/incoming/verification/" description="Every provider's signature scheme, and replay protection." />
-  <LinkCard title="Sources" href="/docs/incoming/sources/" description="What the ingress answers, and how resends are deduplicated." />
-  <LinkCard title="GitLab webhooks" href="/docs/guides/gitlab-webhooks/" description="The same setup for GitLab." />
-</CardGrid>
+This is not limited to 3 days: it reaches back as far as events are kept, 7 days on Railhook Cloud and whatever you configure when self-hosting. Make your handler idempotent on `X-GitHub-Delivery`, since a replay can send deliveries your service already processed. See [Replay](/docs/outgoing/replay/#replay-incoming-webhooks).

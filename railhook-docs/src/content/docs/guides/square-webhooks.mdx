@@ -1,10 +1,10 @@
 ---
 title: Receive Square webhooks reliably
-description: Square disables a webhook subscription that has not answered in three weeks. Put Railhook in front — it verifies x-square-hmacsha256-signature, answers immediately, and forwards to your app with retries and replay.
+description: Square disables a webhook subscription that has not answered in three weeks. Railhook verifies x-square-hmacsha256-signature, answers immediately, and forwards to your app with retries and replay.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
-This guide puts Railhook between Square and your application. Square sends its event notifications to a Railhook source, which verifies the signature, stores each notification as it arrived and forwards it to your service with retries. Square only ever talks to Railhook, which answers straight away, so a slow or failing app stops being Square's problem — and stops being a reason for Square to turn your subscription off.
+Square sends its event notifications to a Railhook source. The source verifies the signature, stores each notification as it arrived and forwards it to your service with retries. Railhook answers Square straight away, so a slow or failing app is no longer a reason for Square to turn your subscription off.
 
 ## Why Square webhooks need a buffer
 
@@ -19,7 +19,7 @@ With Railhook in front:
 
 ## Connect Square
 
-You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
+You need a Railhook project and an API key. The same steps are available under **Incoming** in the dashboard.
 
 ```bash
 export RAILHOOK_URL=https://railhook.io   # or your own instance
@@ -29,7 +29,7 @@ export PROJECT_ID=...
 
 <Steps>
 
-1. **Create the source.** Leave the secret empty for a moment — Square only shows you the signature key once the subscription exists:
+1. **Create the source** without a secret. Square shows the signature key only once the subscription exists:
 
    ```bash
    curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-sources" \
@@ -40,7 +40,7 @@ export PROJECT_ID=...
 
    Keep the `id` and the `ingressUrl` from the response.
 
-2. **Subscribe in the Square Developer Console.** Open your application, go to **Webhooks → Subscriptions**, choose **Sandbox** or **Production** at the top of the page — the two keep separate subscriptions — and click **Add subscription**. Paste the `ingressUrl` exactly as the source shows it as the notification URL, and select the event types you want. ([Square: Subscribe to event notifications](https://developer.squareup.com/docs/webhooks/step2subscribe))
+2. **Subscribe in the Square Developer Console.** Open your application, go to **Webhooks → Subscriptions**, choose **Sandbox** or **Production** at the top of the page (the two keep separate subscriptions), and click **Add subscription**. Paste the `ingressUrl` exactly as the source shows it as the notification URL, and select the event types you want. ([Square: Subscribe to event notifications](https://developer.squareup.com/docs/webhooks/step2subscribe))
 
 3. **Copy the signature key.** Open the subscription's endpoint details and click **Show** next to **Signature Key**. That key is what Square signs with.
 
@@ -73,14 +73,14 @@ export PROJECT_ID=...
 Square's `x-square-hmacsha256-signature` is a base64 HMAC-SHA256 over the **notification URL followed immediately by the raw body**, with no separator, keyed with the signature key. Railhook computes the same thing and compares it in constant time. A request that does not match is answered `401` and is not stored.
 
 <Aside type="caution" title="The URL is part of the signature">
-This is the thing that breaks Square verification, every time. `http` where Square has `https`, a trailing slash, a different host — any of them changes the digest and every genuine notification fails. Railhook rebuilds the URL from its configured public address rather than from the incoming request, so a reverse proxy cannot corrupt it. On a self-hosted instance that address is `APP_BASE_URL`, which the installer sets from `--domain`, or `TUNNEL_INGRESS_BASE_URL` when webhooks arrive on a different host. Paste into Square exactly the ingress URL the source shows, character for character.
+This is the usual cause of failed Square verification. `http` where Square has `https`, a trailing slash, or a different host changes the digest, and every genuine notification fails. Railhook rebuilds the URL from its configured public address rather than from the incoming request, so a reverse proxy cannot corrupt it. On a self-hosted instance that address is `APP_BASE_URL`, which the installer sets from `--domain`, or `TUNNEL_INGRESS_BASE_URL` when webhooks arrive on a different host. Paste into Square exactly the ingress URL the source shows, character for character. See [Configuration](/docs/self-hosting/configuration/).
 </Aside>
 
 Square's scheme carries no timestamp, so an unchanged body always produces the same signature. What separates Square's own retry from a replay is the notification's `event_id`, which Square documents as an idempotency value: Railhook stores it, and a second notification carrying one it already has is answered with the stored event instead of being forwarded again.
 
 ## What your service receives
 
-The body exactly as Square sent it, byte for byte, with Square's own headers passed through — including `square-environment`, which tells you whether the notification came from Sandbox or Production. `x-square-hmacsha256-signature` is not forwarded: your service authenticates Railhook through the destination's credentials and has no use for the signature key. See [Destinations](/docs/incoming/destinations/#what-the-destination-receives).
+The body exactly as Square sent it, byte for byte, with Square's own headers passed through, including `square-environment`, which tells you whether the notification came from Sandbox or Production. `x-square-hmacsha256-signature` is not forwarded: your service authenticates Railhook through the destination's credentials and has no use for the signature key. See [Destinations](/docs/incoming/destinations/#what-the-destination-receives).
 
 ## Develop locally with the CLI
 
@@ -99,12 +99,12 @@ The body exactly as Square sent it, byte for byte, with Square's own headers pas
 </Steps>
 
 <Aside type="tip" title="Sandbox and Production are two sources">
-Square keeps separate subscriptions per environment, and each has its own signature key. Give each one its own Railhook source, so a sandbox key can never verify a production notification — and so `square-environment` and your source name agree.
+Square keeps separate subscriptions per environment, and each has its own signature key. Give each one its own Railhook source, so a sandbox key can never verify a production notification and `square-environment` matches your source name.
 </Aside>
 
 ## Replay after an outage
 
-Replay what arrived while your service was down. Each replayed notification goes to every destination of the source as a new forward:
+Each replayed notification goes to every destination of the source as a new forward:
 
 ```bash
 curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
@@ -114,11 +114,3 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-rep
 ```
 
 Replay reaches back as far as events are kept: 7 days on Railhook Cloud, and whatever you configure when self-hosting. Keep your handler idempotent on `event_id`, since a replay can send notifications your service already processed. See [Replay](/docs/outgoing/replay/#replay-incoming-webhooks).
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Verification" href="/docs/incoming/verification/" description="Every provider's signature scheme, and replay protection." />
-  <LinkCard title="Destinations" href="/docs/incoming/destinations/" description="Credentials, retries and transformations per destination." />
-  <LinkCard title="Configuration" href="/docs/self-hosting/configuration/" description="Set the public address Square signs." />
-</CardGrid>

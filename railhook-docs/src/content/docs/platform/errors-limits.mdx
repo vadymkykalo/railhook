@@ -2,9 +2,9 @@
 title: Errors and limits
 description: The error envelope every API error uses, what each status means, and the rate, size and fan-out limits behind them.
 ---
-import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 
-Every error from the Railhook API has the same shape, so one handler in your client covers all of them. Use this page to tell an error you should fix from one you should retry.
+Every error from the Railhook API has the same shape, so one handler in your client covers all of them.
 
 ## The error envelope
 
@@ -77,7 +77,7 @@ Every response from `POST /api/v1/events` carries the project's current budget:
 
 ## Railhook Cloud limits
 
-Railhook Cloud at railhook.io runs every organization on the Free plan. Every feature is included, workflows, rules, replay and mTLS among them; only volume is limited. Its limits take the place of the self-hosted defaults above:
+Railhook Cloud at railhook.io runs every organization on the Free plan. Every feature is included (workflows, rules, replay, mTLS); only volume is limited. These limits replace the self-hosted defaults above:
 
 | Limit | Free plan |
 |---|---|
@@ -105,11 +105,3 @@ The ingress limit is higher because what a provider sends is not yours to shrink
 ## Responses at an ingress URL
 
 An ingress URL answers the provider that sent the webhook, not you, so its responses are shorter: a successful receive is `202` with `status` and `requestId`, and an error carries `error` and `message` without `status`. When a deployment with plans runs out of quota, the ingress URL answers `429` with `Retry-After: 3600` and no detail, so a provider never learns anything about your plan.
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="API reference" href="/docs/api-reference/" description="Status codes for every request." />
-  <LinkCard title="Authentication" href="/docs/platform/authentication/" description="Fix a 401 or a 403." />
-  <LinkCard title="Retries and failed messages" href="/docs/outgoing/retries/" description="How Railhook retries your endpoints." />
-</CardGrid>

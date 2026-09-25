@@ -2,9 +2,9 @@
 title: Встановлення з Docker
 description: Встановіть Railhook інсталятором в один рядок або запустіть той самий Compose-файл самостійно.
 ---
-import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-Обидва способи запускають той самий `docker-compose.yml`. Інсталятор також генерує справжні секрети й перевіряє конфігурацію, перш ніж щось запускати, тож користуйтеся ним, якщо немає вагомих причин робити інакше.
+Обидва способи запускають той самий `docker-compose.yml`. Інсталятор також генерує секрети й перевіряє конфігурацію до запуску.
 
 <Tabs syncKey="install">
   <TabItem label="Інсталятор">
@@ -16,7 +16,7 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
        curl -fsSL https://railhook.io/install.sh | bash
        ```
 
-       Він перевіряє Docker, Compose, пам'ять, диск і порт. Потім створює каталог `~/railhook` із `docker-compose.yml`, закріпленим на останньому релізі, `.env` зі згенерованими секретами та допоміжним скриптом `railhook`. Наостанок запускає стек і чекає, доки API почне відповідати. Під час першого запуску виконуються міграції бази даних і створюються топіки Kafka, тож він може тривати кілька хвилин.
+       Він перевіряє Docker, Compose, пам'ять, диск і порт, потім створює `~/railhook`: `docker-compose.yml`, закріплений на останньому релізі, `.env` зі згенерованими секретами та допоміжний скрипт `railhook`. Далі запускає стек і чекає на API. Перший запуск виконує міграції й створює топіки Kafka, тож може тривати кілька хвилин.
 
     2. **Відкрийте панель керування**
 
@@ -63,7 +63,7 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
     | `./railhook backup` | Записує дамп бази даних у каталог |
     | `./railhook doctor` | Повторно виконує всі перевірки для файлів на диску |
 
-    Будь-який інший аргумент передається просто в Docker Compose, тож `./railhook ps` чи `./railhook up -d` працюють так, як ви очікуєте.
+    Будь-який інший аргумент передається в Docker Compose, тож `./railhook ps` чи `./railhook up -d` працюють.
   </TabItem>
   <TabItem label="Docker Compose вручну">
     <Steps>
@@ -115,11 +115,3 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
 <Aside type="caution">
 Інсталятор закріплює теги образів у `.env` (`API_IMAGE_TAG`, `WORKER_IMAGE_TAG`, `UI_IMAGE_TAG`). У `.env`, створеному вручну з `.env.dist`, стоїть `latest`, а цей тег непомітно для вас переходить на нові версії. Закріпіть теги на конкретному релізі.
 </Aside>
-
-## Що далі
-
-<CardGrid>
-  <LinkCard title="Домен і HTTPS" description="Підключіть до інстансу домен і сертифікат." href="/docs/uk/self-hosting/domain-https/" />
-  <LinkCard title="Конфігурація" description="Налаштування, які треба визначити до запуску в продакшн." href="/docs/uk/self-hosting/configuration/" />
-  <LinkCard title="Швидкий старт" description="Надішліть першу подію." href="/docs/uk/start/quickstart/" />
-</CardGrid>

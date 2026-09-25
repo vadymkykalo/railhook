@@ -2,7 +2,7 @@
 title: SDKs
 description: Official Node.js, Python and PHP libraries for sending events, managing endpoints and verifying signatures.
 ---
-import { Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 The SDKs wrap the parts of the API you call from application code: events, endpoints, subscriptions, deliveries, incoming sources and incoming events, plus signature verification. They authenticate with an API key alone.
 
@@ -101,11 +101,3 @@ Each SDK also provides `constructEvent` (`construct_event` in Python), which ver
 <Aside type="tip">
 The SDKs do not cover transformations, rules, workflows, schemas, the DLQ, alerts or project administration. Each SDK has a generic request helper for those, and the [API reference](/docs/api-reference/) lists every endpoint.
 </Aside>
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Send your first webhook" description="Endpoint, subscription, event and signature, end to end." href="/docs/start/send-first-webhook/" />
-  <LinkCard title="Signatures" description="Both signing schemes and secret rotation." href="/docs/outgoing/signatures/" />
-  <LinkCard title="MCP server" description="Let an AI agent work with the same project through its API key." href="/docs/tools/mcp/" />
-</CardGrid>

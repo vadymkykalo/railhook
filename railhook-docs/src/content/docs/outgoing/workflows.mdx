@@ -2,7 +2,7 @@
 title: Workflows
 description: Run a graph of steps when an event arrives, to filter it, reshape it, call a service, deliver it, or send a new event.
 ---
-import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 
 A workflow is a graph of steps that runs when an event is sent, or when you start it yourself. Each step receives the output of the step before it. The dashboard has a visual builder; the same workflow can be created through the API.
 
@@ -80,11 +80,3 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/workflows" \
 - A `slack` node only accepts a URL that starts with `https://hooks.slack.com/`.
 - Each step stores its input and output as they were. Anything secret in the data is readable in the run history, so mask it first. See [PII masking](/docs/platform/pii-masking/).
 </Aside>
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Rules" href="/docs/outgoing/rules/" description="Single-step routing decisions, evaluated before deliveries exist." />
-  <LinkCard title="Transformations" href="/docs/outgoing/transformations/" description="Saved templates a transform node can reuse." />
-  <LinkCard title="API reference" href="/docs/api-reference/" description="Every workflow request and response." />
-</CardGrid>

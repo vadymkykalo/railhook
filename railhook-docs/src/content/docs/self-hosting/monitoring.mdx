@@ -2,9 +2,9 @@
 title: Monitoring
 description: Health checks, Prometheus metrics, the bundled Grafana stack with host, container, uptime and log alerts, and the signals worth alerting on.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
-Railhook exposes health checks on its public port and Prometheus metrics on internal ports. The repository ships an optional monitoring stack — Grafana, Prometheus, Alertmanager, Loki and exporters for the host, the containers and uptime — that you start next to it with one Compose command.
+Health checks are on the public port, Prometheus metrics on internal ports. An optional monitoring stack (Grafana, Prometheus, Alertmanager, Loki, and exporters for the host, containers and uptime) starts next to Railhook with one Compose command.
 
 ## Health checks
 
@@ -19,22 +19,22 @@ nginx proxies only the health paths. Every other `/actuator/` path answers `404`
 
 ## Metrics
 
-Metrics are on separate management ports, inside the Docker network only, and need no credentials:
+Metrics are on management ports inside the Docker network only, with no credentials:
 
 | Service | Metrics URL |
 |---|---|
 | API | `http://api:8082/actuator/prometheus` |
 | Worker | `http://worker:8081/actuator/prometheus` |
 
-They are deliberately not proxied to the public port: metrics would reveal endpoint names and traffic volume to anyone who asked.
+They are not proxied to the public port because they would reveal endpoint names and traffic volume.
 
-Both services always publish them, whether or not you run the bundled stack, so any Prometheus you already have can scrape these ports: HTTP request latency buckets, Kafka client metrics, and counters for events ingested, deliveries created, rules matched and retention cleanup. Their labels stay bounded — no organization, project or endpoint ids.
+Both services always publish them, so any existing Prometheus can scrape these ports: HTTP latency buckets, Kafka client metrics, and counters for events ingested, deliveries created, rules matched and retention cleanup. Labels stay bounded: no organization, project or endpoint ids.
 
 ## The bundled stack
 
-`monitoring/` in the repository is a second Compose project: Grafana, Prometheus, Alertmanager, Loki and Promtail, node-exporter, cAdvisor and blackbox-exporter. It is off until you start it, and its memory limits add up to 1.5 GB.
+`monitoring/` in the repository is a second Compose project: Grafana, Prometheus, Alertmanager, Loki and Promtail, node-exporter, cAdvisor and blackbox-exporter. It is off until started; its memory limits add up to 1.5 GB.
 
-Only Grafana publishes a port, on `127.0.0.1:3001`. Prometheus, Alertmanager and Loki are reachable only inside the stack's network; Grafana's Explore and Alerting pages read all three.
+Only Grafana publishes a port, `127.0.0.1:3001`. Prometheus, Alertmanager and Loki stay inside the stack's network; Grafana's Explore and Alerting pages read all three.
 
 ### On a server installed with install.sh
 
@@ -47,7 +47,7 @@ Only Grafana publishes a port, on `127.0.0.1:3001`. Prometheus, Alertmanager and
    echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)" >> .env
    ```
 
-2. **Say where alerts go.** Email goes through the relay the platform already uses (`EMAIL_FROM`, `SMTP_*`) unless you set the `ALERTMANAGER_SMTP_*` variables. Each mail links to Grafana on `MONITORING_DOMAIN`; without a domain it says how to open Grafana through an SSH tunnel.
+2. **Say where alerts go.** Email uses the platform's relay (`EMAIL_FROM`, `SMTP_*`) unless you set `ALERTMANAGER_SMTP_*`. Each mail links to Grafana on `MONITORING_DOMAIN`; without a domain it explains the SSH tunnel.
 
    ```bash
    echo "ALERTMANAGER_EMAIL_TO=you@example.com" >> .env
@@ -88,12 +88,12 @@ Set `MONITORING_DOMAIN=grafana.example.com` in `.env`, point that name at the se
 curl -fsSL https://railhook.io/install.sh | bash -s -- --refresh --dir /opt/railhook
 ```
 
-It adds the name to the Caddyfile and reloads Caddy, which obtains a certificate the same way it did for the platform. `./railhook upgrade` keeps the block. With `--behind-proxy`, point your own proxy at `127.0.0.1:3001` instead.
+It adds the name to the Caddyfile and reloads Caddy, which gets a certificate as it did for the platform. `./railhook upgrade` keeps the block. With `--behind-proxy`, point your own proxy at `127.0.0.1:3001` instead.
 
 <Aside type="caution">
-Put an identity-aware proxy such as Cloudflare Access in front of that name. Grafana's login should not be the only thing between the internet and your logs. If the proxy covers every path, exempt `/.well-known/acme-challenge/`, or Caddy cannot renew the certificate.
+Put an identity-aware proxy such as Cloudflare Access in front of that name, so Grafana's login is not the only barrier to your logs. If the proxy covers every path, exempt `/.well-known/acme-challenge/`, or Caddy cannot renew the certificate.
 
-Some proxies stop Let's Encrypt from reaching the name at all: Cloudflare with Always Use HTTPS sends the challenge to HTTPS, where there is no certificate yet. Give Caddy one instead, such as a Cloudflare origin certificate for that name. Copy the certificate and key into the Caddy data volume, name them in `.env`, and run the `--refresh` above again:
+Cloudflare with Always Use HTTPS sends the Let's Encrypt challenge to HTTPS, where there is no certificate yet. Give Caddy one instead (for example a Cloudflare origin certificate for that name): copy it and the key into the Caddy data volume, name them in `.env`, and run the `--refresh` above again:
 
 ```bash
 docker exec webhook-caddy mkdir -p /data/certs
@@ -137,7 +137,7 @@ printf '%s\n' MONITORING_TLS_CERT=/data/certs/grafana.example.com.pem \
 
 ### Alerts it sends
 
-The platform's rules are the same set the Helm chart ships. On top of them, for the server:
+The platform rules are the ones the Helm chart ships. Server rules on top:
 
 | Alert | Fires when |
 |---|---|
@@ -155,16 +155,16 @@ The platform's rules are the same set the Helm chart ships. On top of them, for 
 The probes request `https://RAILHOOK_DOMAIN/`, `/docs/` and `/actuator/health`; set `MONITORING_PROBE_URLS` to probe other URLs.
 
 <Aside type="tip">
-Every other alert is sent from the server it describes, so none of them can tell you that server is down. Point `ALERTMANAGER_HEARTBEAT_URL` at a heartbeat service such as healthchecks.io: it receives the `Watchdog` every minute and alerts you when it stops arriving.
+Every other alert comes from the server it describes, so none can report that server down. Point `ALERTMANAGER_HEARTBEAT_URL` at a heartbeat service such as healthchecks.io: it gets the `Watchdog` every minute and alerts you when it stops.
 </Aside>
 
-The stack finds the platform's Docker network by its Compose label. If it picks the wrong one, set `RAILHOOK_NETWORK`. Every variable is in the [configuration reference](/docs/self-hosting/configuration/).
+The stack finds the platform's Docker network by its Compose label; set `RAILHOOK_NETWORK` if it picks the wrong one. Every variable is in the [configuration reference](/docs/self-hosting/configuration/).
 
 ## What to alert on
 
 | Metric | Why |
 |---|---|
-| `delivery_oldest_pending_age_seconds` | The age of the oldest unfinished delivery. Every cause of trouble shows up here. `forward_oldest_pending_age_seconds` is the incoming twin |
+| `delivery_oldest_pending_age_seconds` | The age of the oldest unfinished delivery. Every kind of trouble shows up here. `forward_oldest_pending_age_seconds` is the incoming twin |
 | `webhook_dlq_depth`, `incoming_forward_dlq_depth` | Deliveries and forwards that ran out of retries and need a person |
 | `outbox_oldest_pending_age_seconds` | Accepted events that have not reached Kafka yet |
 | `circuit_breaker_degraded_total` | Redis was unreachable and the breaker let calls through unprotected |
@@ -184,11 +184,3 @@ monitoring:
 ```
 
 The ServiceMonitor scrapes the `management` port of the API and the worker.
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Observability" description="Every metric, grouped by the question it answers." href="/docs/platform/observability/" />
-  <LinkCard title="Alerts" description="Alert rules you configure in the dashboard." href="/docs/platform/alerts/" />
-  <LinkCard title="Troubleshooting" description="Symptoms and fixes." href="/docs/self-hosting/troubleshooting/" />
-</CardGrid>

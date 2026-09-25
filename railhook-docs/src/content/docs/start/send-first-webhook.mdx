@@ -2,9 +2,9 @@
 title: Send your first webhook
 description: Register an endpoint, subscribe it to an event type, send an event and verify its signature on the receiving side.
 ---
-import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-This page takes one event from your system to your customer's endpoint through the API, and shows the receiver how to prove the request came from you. You need a project ID and an API key with the `READ_WRITE` scope ([Quickstart](/docs/start/quickstart/) covers both).
+You need a project ID and an API key with the `READ_WRITE` scope (see [Quickstart](/docs/start/quickstart/)).
 
 ```bash
 export RAILHOOK_URL=https://railhook.io   # or your own instance, e.g. http://localhost or https://hooks.example.com
@@ -23,7 +23,7 @@ export PROJECT_ID=...
      -d '{"url":"https://api.customer.com/webhooks","description":"Orders"}'
    ```
 
-   The response includes the endpoint's `id` and its `secret`. The receiver needs the secret to check signatures.
+   The response includes the endpoint's `id` and its `secret`, which the receiver uses to check signatures.
 
 2. **Subscribe it to an event type**
 
@@ -130,18 +130,10 @@ export PROJECT_ID=...
      </TabItem>
    </Tabs>
 
-   By default the SDKs also reject a timestamp more than five minutes old, so a captured request cannot be replayed later.
+   The SDKs also reject a timestamp older than five minutes by default, so a captured request cannot be replayed.
 
 </Steps>
 
 <Aside type="tip">
 Delivery is at-least-once. An attempt can succeed at your endpoint and fail to be recorded, so answer `2xx` quickly and ignore a delivery ID you have already processed.
 </Aside>
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Signatures" description="Both signing schemes, secret rotation and Standard Webhooks." href="/docs/outgoing/signatures/" />
-  <LinkCard title="Retries and failed messages" description="What happens while the endpoint is down." href="/docs/outgoing/retries/" />
-  <LinkCard title="SDKs" description="Node.js, Python and PHP clients." href="/docs/tools/sdks/" />
-</CardGrid>

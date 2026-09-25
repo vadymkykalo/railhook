@@ -1,10 +1,10 @@
 ---
 title: Troubleshooting
-description: The problems self-hosted installations actually hit, what causes each one, and how to fix it.
+description: Common self-hosted installation problems, their causes, and fixes.
 ---
-import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 
-Start here, from the install directory:
+From the install directory:
 
 ```bash
 ./railhook doctor        # machine and configuration checks
@@ -44,16 +44,9 @@ Start here, from the install directory:
 | `docker logs webhook-api` finds nothing | The API has no fixed container name since 2.16.0 | Use `docker compose logs api` |
 
 <Aside type="tip">
-In a restored or recovering installation, a burst of `delivery already claimed or not PENDING` messages in the worker log is expected. Stale Kafka messages are being declined, which is the intended behaviour.
+After a restore, a burst of `delivery already claimed or not PENDING` in the worker log is expected: stale Kafka messages are being declined.
 </Aside>
 
 ## Still stuck
 
-Open an issue at [github.com/vadymkykalo/railhook/issues](https://github.com/vadymkykalo/railhook/issues) with the output of `./railhook doctor` and the relevant log lines. Remove any secrets first.
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Configuration" description="What each setting decides." href="/docs/self-hosting/configuration/" />
-  <LinkCard title="Monitoring" description="Catch problems before users report them." href="/docs/self-hosting/monitoring/" />
-</CardGrid>
+Open an issue at [github.com/vadymkykalo/railhook/issues](https://github.com/vadymkykalo/railhook/issues) with the output of `./railhook doctor` and the relevant log lines, secrets removed.

@@ -2,13 +2,13 @@
 title: Verify signatures
 description: Check that a delivery came from Railhook and was not changed on the way, with an SDK or with plain HMAC.
 ---
-import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-Every delivery is signed with the endpoint's secret. Verify the signature before you act on a request, so that nobody who learns your endpoint URL can send you events.
+Every delivery is signed with the endpoint's secret. Verify the signature before you act on a request, so nobody who learns your endpoint URL can send you events.
 
 ## Two signature schemes
 
-A delivery can carry two independent signatures over the same body. The endpoint's `signatureScheme` decides which are sent:
+A delivery can carry two independent signatures over the same body. The endpoint's `signatureScheme` picks which:
 
 | `signatureScheme` | Headers sent |
 |---|---|
@@ -16,7 +16,7 @@ A delivery can carry two independent signatures over the same body. The endpoint
 | `LEGACY` | Only `X-Signature`. |
 | `STANDARD` | Only `webhook-id`, `webhook-timestamp`, `webhook-signature`. |
 
-A receiver ignores the headers it does not read, so verify either one. Narrow the endpoint to a single scheme only once nothing reads the other.
+Verify either one. Narrow the endpoint to one scheme only once nothing reads the other.
 
 ## Headers on every delivery
 
@@ -105,7 +105,7 @@ try {
 
 ### Without an SDK
 
-The same check in plain code. Read every `v1` in the header, not only the first one.
+Read every `v1` in the header, not only the first.
 
 <Tabs syncKey="lang">
 <TabItem label="Node.js">
@@ -205,13 +205,13 @@ function verify(string $rawBody, string $header, string $secret): bool
 
 ## Verify the Standard Webhooks headers
 
-The Standard Webhooks headers follow a published convention, so an off-the-shelf library can verify them. Three things differ from `X-Signature`:
+These follow the published Standard Webhooks spec, so any library for it can verify them. Three differences from `X-Signature`:
 
 - The signed string is `<webhook-id>.<webhook-timestamp>.<raw body>`: the id is part of it.
 - `webhook-timestamp` is in seconds, not milliseconds.
 - The digest is base64, not hex, and the key is the endpoint's `standardWebhooksSecret`, in the form `whsec_<base64>`.
 
-The API returns `standardWebhooksSecret` next to `secret`, at creation and at rotation. The SDKs also accept a raw secret and use it as-is, so passing the wrong form fails as an invalid signature, not as an error that names the form.
+The API returns `standardWebhooksSecret` next to `secret`, at creation and at rotation. The SDKs also accept a raw secret and use it as-is, so passing the wrong one fails as an invalid signature, not as a format error.
 
 <Tabs syncKey="lang">
 <TabItem label="Node.js">
@@ -283,7 +283,7 @@ try {
    X-Signature: t=1735689600000,v1=8f2a41c7…new,v1=3b90de55…retired
    ```
 
-3. Deploy the new secret to the receiver at any point inside that window. After the window closes, only the new secret signs.
+3. Deploy the new secret to the receiver inside that window. After it closes, only the new secret signs.
 
 </Steps>
 
@@ -294,11 +294,3 @@ try {
 - Read every `v1` or every space-separated entry. Taking only one makes a rotation look like a forged request.
 - Do not mix the units: `X-Timestamp` is milliseconds, `webhook-timestamp` is seconds.
 </Aside>
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Endpoint security" href="/docs/outgoing/endpoint-security/" description="Ownership checks, client certificates and private address rules." />
-  <LinkCard title="SDKs" href="/docs/tools/sdks/" description="Install the Node.js, Python and PHP SDKs." />
-  <LinkCard title="Retries and failed messages" href="/docs/outgoing/retries/" description="What your answer to a delivery decides." />
-</CardGrid>

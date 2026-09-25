@@ -1,16 +1,16 @@
 ---
 title: Receive GitLab webhooks reliably
-description: Stop GitLab from disabling your webhook when your app is slow or down — Railhook checks X-Gitlab-Token, answers at once, and forwards to your service with retries and replay.
+description: Keep GitLab from disabling your webhook when your app is slow or down. Railhook checks X-Gitlab-Token, answers at once, and forwards to your service with retries and replay.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
-This guide puts Railhook between GitLab and your application. GitLab sends its webhooks to a Railhook source, which checks the secret token, stores each webhook as it arrived and forwards it to your service with retries. GitLab only ever talks to Railhook, which answers straight away, so your service being slow or down no longer counts against the webhook.
+GitLab sends its webhooks to a Railhook source. The source checks the secret token, stores each webhook as it arrived and forwards it to your service with retries. Railhook answers GitLab straight away, so a slow or down service no longer counts against the webhook.
 
 ## Why GitLab webhooks need a buffer
 
-GitLab disables a webhook that keeps failing. After four consecutive failures it is disabled temporarily, for one minute at first and for up to 24 hours as failures continue; after 40 consecutive failures it is disabled permanently and is not re-enabled on its own. GitLab also asks you to respond before its timeout and to be ready for duplicate events when a webhook times out. ([GitLab: Webhooks](https://docs.gitlab.com/user/project/integrations/webhooks/))
+GitLab disables a webhook that keeps failing. After four consecutive failures it is disabled for one minute, growing to up to 24 hours as failures continue. After 40 consecutive failures it is disabled permanently and stays off. A webhook that times out can also be sent again as a duplicate. ([GitLab: Webhooks](https://docs.gitlab.com/user/project/integrations/webhooks/))
 
-A few bad deploys can therefore switch your integration off without anyone noticing. With Railhook in front:
+A few bad deploys can switch your integration off unnoticed. With Railhook in front:
 
 - GitLab's requests are answered as soon as they are stored, so they do not time out or fail because of your service.
 - Your service gets up to 5 attempts per forward, with waits from 1 minute to 1 hour, and what still fails lands in **Failed Forwards**.
@@ -18,7 +18,7 @@ A few bad deploys can therefore switch your integration off without anyone notic
 
 ## Connect GitLab
 
-You need a Railhook project and an API key. Everything below can also be done under **Incoming** in the dashboard.
+You need a Railhook project and an API key. The same steps are available under **Incoming** in the dashboard.
 
 ```bash
 export RAILHOOK_URL=https://railhook.io   # or your own instance
@@ -90,7 +90,7 @@ The body exactly as GitLab sent it, byte for byte. Railhook passes GitLab's even
 
 ## Replay after an outage
 
-Replay what arrived while your service was down. Each replayed webhook goes to every destination of the source as a new forward:
+Each replayed webhook goes to every destination of the source as a new forward:
 
 ```bash
 curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-replay" \
@@ -100,11 +100,3 @@ curl -X POST "$RAILHOOK_URL/api/v1/projects/$PROJECT_ID/incoming-events/bulk-rep
 ```
 
 Replay reaches back as far as events are kept: 7 days on Railhook Cloud, and whatever you configure when self-hosting. Make your handler idempotent on what the webhook is about, such as the commit or merge request in the body, since a replay can send webhooks your service already processed. See [Replay](/docs/outgoing/replay/#replay-incoming-webhooks).
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Verification" href="/docs/incoming/verification/" description="Every provider's signature scheme, and replay protection." />
-  <LinkCard title="Sources" href="/docs/incoming/sources/" description="What the ingress answers, and how resends are deduplicated." />
-  <LinkCard title="GitHub webhooks" href="/docs/guides/github-webhooks/" description="The same setup for GitHub." />
-</CardGrid>

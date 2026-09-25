@@ -2,7 +2,7 @@
 title: Verification
 description: Prove that an incoming webhook came from the provider, with the provider's own signature scheme or a generic HMAC.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
 Anyone who learns a source's ingress URL can send requests to it. Verification checks each request against the secret the provider signs with, and refuses what does not match before anything is stored.
 
@@ -34,7 +34,7 @@ A request that fails verification is answered `401` and is not stored.
 For every provider the secret goes in the source's `hmacSecret`: the webhook signing secret, the GitLab secret token, the Twilio auth token, the Square signature key, the Adyen HMAC key as the hexadecimal string the Customer Area shows, or the HubSpot app's client secret.
 
 <Aside type="tip" title="SendGrid's is a public key, not a secret">
-SendGrid keeps the private half of the pair and signs with it. What goes into `hmacSecret` is the public verification key its Event Webhook settings display, so holding it forges nothing. Railhook still stores it encrypted, because it is the same field. Paste it as SendGrid shows it, or as PEM — both are read.
+SendGrid keeps the private half of the pair and signs with it. What goes into `hmacSecret` is the public verification key its Event Webhook settings display, so holding it forges nothing. Railhook still stores it encrypted, because it is the same field. Paste it as SendGrid shows it, or as PEM; both are read.
 </Aside>
 
 <Aside type="caution" title="Twilio, Square and HubSpot sign the URL">
@@ -42,7 +42,7 @@ All three include the URL they were configured with in what they sign, so `http`
 </Aside>
 
 <Aside type="caution" title="Two providers cannot be deduplicated on a provider event id">
-SendGrid and HubSpot post a batch of events in one request and identify each event inside it rather than the request. There is no id for the request to key on, and keying on the first event in a batch would silently drop the rest if the provider ever re-cut the batch on a retry. So no `providerEventId` is recorded for those two, and their protection against a repeated request is the signed timestamp each carries plus the replay window below. Deduplicate per event — `sg_event_id`, `eventId` — in your own handler. Adyen names no event id either; a notification carrying exactly one item is keyed on `pspReference:eventCode`, the pair Adyen says two copies of one event share.
+SendGrid and HubSpot post a batch of events in one request and identify each event inside it rather than the request. There is no id for the request to key on, and keying on the first event in a batch would silently drop the rest if the provider ever re-cut the batch on a retry. So no `providerEventId` is recorded for those two, and their protection against a repeated request is the signed timestamp each carries plus the replay window below. Deduplicate per event (`sg_event_id`, `eventId`) in your own handler. Adyen names no event id either; a notification carrying exactly one item is keyed on `pspReference:eventCode`, the pair Adyen says two copies of one event share.
 </Aside>
 
 ## Set up a provider
@@ -101,11 +101,3 @@ A request carrying a provider event id that Railhook has already stored is a res
 <Aside type="tip">
 Prefer a provider preset where one exists, and the `t=…,v1=…` shape where the provider can send it. If you must accept a bare digest, size the replay window against how long a captured request would still be worth replaying.
 </Aside>
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Sources" href="/docs/incoming/sources/" description="Create a source and read what the ingress answers." />
-  <LinkCard title="Destinations" href="/docs/incoming/destinations/" description="Forward verified webhooks to your services." />
-  <LinkCard title="Verify signatures" href="/docs/outgoing/signatures/" description="The other direction: how receivers verify Railhook." />
-</CardGrid>

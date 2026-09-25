@@ -2,9 +2,9 @@
 title: PII masking
 description: Hide personal data in the dashboard and in shared debug links without changing what is stored or delivered.
 ---
-import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 
-PII masking rules redact values in a payload when that payload is shown to a person. Set them up per project so support staff, and anyone you send a debug link to, can work with a payload without seeing the personal data in it.
+PII masking rules redact values in a payload when it is shown to a person: support staff, or anyone you send a debug link to. Rules are set per project.
 
 <Aside type="caution" title="Masking changes what a screen shows, nothing else">
 The stored payload is unchanged, and your endpoint receives the unmasked payload. Masking limits who sees a value. It does not stop the value being kept, and it is not a way to answer a data-erasure request. If a field must never be stored, remove it before you send the event, or remove it in a [transformation](/docs/outgoing/transformations/).
@@ -19,7 +19,7 @@ The stored payload is unchanged, and your endpoint receives the unmasked payload
 | Event diff | Both sides of a comparison between two events |
 | Shared debug links | The payload behind the link |
 
-Shared debug links matter most. Anyone with the URL can open one without signing in, so masking is what makes it safe to send one outside your organization.
+Anyone with a shared debug link can open it without signing in, so masking is what makes it safe to send one outside your organization.
 
 ## Two kinds of rule
 
@@ -51,11 +51,3 @@ To check a rule before you rely on it, preview it against a sample payload on th
 - **Not encryption.** Secrets and certificates are encrypted at rest separately. Masking does not touch storage.
 - **Not a delivery filter.** The receiver is trusted with the payload; the person looking at the dashboard may not be.
 - **Not an audit control.** It changes what is shown. It does not record who looked.
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Data retention and export" href="/docs/resources/data-retention/" description="What actually removes stored payloads, and when." />
-  <LinkCard title="Transformations" href="/docs/outgoing/transformations/" description="Remove a field before it is delivered." />
-  <LinkCard title="Organizations and roles" href="/docs/platform/organizations-rbac/" description="Who can see a project at all." />
-</CardGrid>

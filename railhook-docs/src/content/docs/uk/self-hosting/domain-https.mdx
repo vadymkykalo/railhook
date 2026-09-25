@@ -2,9 +2,9 @@
 title: Домен і HTTPS
 description: Запустіть Railhook на власному домені із сертифікатом, що оновлюється автоматично, або за проксі, який у вас уже працює.
 ---
-import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-Перш ніж відкривати інстанс в інтернет, налаштуйте для нього домен і HTTPS. Інсталятор може зробити це за вас, або ж Railhook можна поставити за зворотний проксі, який у вас уже працює.
+Дайте інстансу, відкритому в інтернет, домен і HTTPS: через інсталятор або за зворотним проксі, який у вас уже працює.
 
 <Tabs syncKey="https">
   <TabItem label="Вбудований HTTPS">
@@ -48,7 +48,7 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
        curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.com --behind-proxy
        ```
 
-       Ви отримуєте всі налаштування з таблиці вбудованого HTTPS, крім TLS-термінатора. Caddy не запускається, а сертифікат лишається у вашого проксі. nginx панелі слухає на `127.0.0.1:8080`. Щоб вибрати інший loopback-порт, скористайтеся `--port`.
+       Діють усі налаштування з таблиці вбудованого HTTPS, крім TLS-термінатора: Caddy не запускається, сертифікат лишається у вашого проксі. nginx панелі слухає на `127.0.0.1:8080` (змінюється через `--port`).
 
     2. **Проксуйте все на 127.0.0.1:8080**
 
@@ -60,7 +60,7 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
 
 ## У режимі production
 
-З `APP_ENV=production` API відмовляється запускатися, замість того щоб працювати, якщо:
+З `APP_ENV=production` API відмовляється запускатися, якщо:
 
 - секрет досі містить заглушку або типове значення з дистрибутива,
 - `WEBHOOK_ALLOW_PRIVATE_IPS=true`,
@@ -68,10 +68,3 @@ import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starli
 - `CORS_ALLOWED_ORIGINS` досі містить `localhost`.
 
 `./railhook doctor` перевіряє це заздалегідь. Він також попереджає, якщо `APP_BASE_URL` досі вказує на localhost або вимкнено `EMAIL_ENABLED`: без пошти облікові записи створюються вже підтвердженими, а запросити нікого не можна.
-
-## Що далі
-
-<CardGrid>
-  <LinkCard title="Конфігурація" description="Пошта, секрети та решта налаштувань." href="/docs/uk/self-hosting/configuration/" />
-  <LinkCard title="Оновлення й резервні копії" description="Тримайте інстанс актуальним і готовим до відновлення." href="/docs/uk/self-hosting/upgrade-backup/" />
-</CardGrid>

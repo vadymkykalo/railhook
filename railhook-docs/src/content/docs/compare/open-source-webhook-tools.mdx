@@ -1,10 +1,10 @@
 ---
 title: Open-source webhook tools compared (2026)
-description: Railhook, Svix, Hookdeck Outpost, Convoy and Hook0 side by side — licence, direction, what the self-hosted build includes, and how each one runs.
+description: "Railhook, Svix, Hookdeck Outpost, Convoy and Hook0 side by side: licence, direction, what the self-hosted build includes, and how each one runs."
 ---
-import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 
-Use this page to shortlist a webhook server you can run yourself. It covers the five projects whose source you can download and self-host, and separates the ones under an open-source licence from the source-available ones, because that decides what you may do with them.
+Five webhook servers whose source you can download and self-host. Open-source and source-available licences are kept apart, because the licence decides what you may do with them.
 
 <Aside title="Verified 2026-09-18">
 Details come from each project's own website and repository, linked below, as they read on 18 September 2026. Railhook is our product; its gaps are listed as plainly as the others'. Send a correction as a pull request if something here is out of date.
@@ -37,11 +37,11 @@ A dash means the pages we checked did not settle the point. It is not a claim th
 
 ## In one line each
 
-- **Railhook** — both directions in one MIT product, every feature self-hosted with no licence key, a localhost tunnel in the CLI, an embeddable customer portal. HTTP delivery only, no OpenTelemetry. [Railhook vs the others](/docs/resources/comparison/).
-- **Svix** — a mature sending platform, with 9 SDKs, a Terraform provider and SOC 2 and HIPAA on the hosted service; the open-source server leaves out the App Portal and transformations. [Railhook vs Svix](/docs/compare/svix/).
-- **Hookdeck Outpost** — sending only, and the one to pick when your customers' receivers are SQS, Kafka, EventBridge, Pub/Sub or RabbitMQ. Hookdeck's receiving gateway is a separate, closed-source SaaS. [Railhook vs Hookdeck](/docs/compare/hookdeck/).
-- **Convoy** — both directions, under a source-available licence, with portal links, JavaScript transformations, OpenTelemetry and RBAC in paid editions. [Railhook vs Convoy](/docs/compare/convoy/).
-- **Hook0** — sending, with an EU-hosted cloud, under the SSPL. [Railhook vs Hook0](/docs/compare/hook0/).
+- **Railhook**: both directions in one MIT product, every feature self-hosted with no licence key, a localhost tunnel in the CLI, an embeddable customer portal. HTTP delivery only, no OpenTelemetry. [Railhook vs the others](/docs/resources/comparison/).
+- **Svix**: a mature sending platform, with 9 SDKs, a Terraform provider and SOC 2 and HIPAA on the hosted service; the open-source server leaves out the App Portal and transformations. [Railhook vs Svix](/docs/compare/svix/).
+- **Hookdeck Outpost**: sending only, and the one to pick when your customers' receivers are SQS, Kafka, EventBridge, Pub/Sub or RabbitMQ. Hookdeck's receiving gateway is a separate, closed-source SaaS. [Railhook vs Hookdeck](/docs/compare/hookdeck/).
+- **Convoy**: both directions, under a source-available licence, with portal links, JavaScript transformations, OpenTelemetry and RBAC in paid editions. [Railhook vs Convoy](/docs/compare/convoy/).
+- **Hook0**: sending, with an EU-hosted cloud, under the SSPL. [Railhook vs Hook0](/docs/compare/hook0/).
 
 ## How to choose
 
@@ -49,11 +49,3 @@ A dash means the pages we checked did not settle the point. It is not a claim th
 - **Your customers' receivers are queues:** Outpost.
 - **Your customers must manage their own endpoints, and hosting with a vendor is fine:** Svix.
 - **Your hosted data must stay in the EU and a hosted service is required:** Hook0, or self-host any of the others in your own region.
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="How Railhook compares" href="/docs/resources/comparison/" description="Railhook's strengths and every gap, in detail." />
-  <LinkCard title="Install with Docker" href="/docs/self-hosting/install-docker/" description="Run Railhook on your own server." />
-  <LinkCard title="Migrate to Railhook" href="/docs/resources/migrating/" description="Move from another platform with both live." />
-</CardGrid>

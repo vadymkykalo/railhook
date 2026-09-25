@@ -2,9 +2,9 @@
 title: Observability
 description: Scrape Railhook's metrics, read the numbers that show whether it is healthy, and route the shipped Prometheus alerts.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
-Railhook exports Prometheus metrics, ships alert rules and Grafana dashboards, and writes structured logs. This page shows where to scrape, which few numbers to watch, and what each shipped alert means.
+Railhook exports Prometheus metrics, ships alert rules and Grafana dashboards, and writes structured logs.
 
 ## Where the metrics are
 
@@ -46,8 +46,6 @@ On Kubernetes the Helm chart wires this up: its `ServiceMonitor` scrapes the por
 [Monitoring](/docs/self-hosting/monitoring/) covers serving Grafana on its own domain and the host, container, uptime and log alerts.
 
 ## The numbers that matter
-
-Railhook exports far more series than anyone should watch. These answer the questions that matter.
 
 ### Is work getting through?
 
@@ -118,11 +116,3 @@ In production the API and worker log single-line JSON that includes the correlat
 ## Tracing
 
 There is none. Railhook has no OpenTelemetry export, so a slow delivery cannot be followed from ingestion through Kafka to the attempt as one trace.
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Monitoring a deployment" href="/docs/self-hosting/monitoring/" description="Health checks and what to watch after install." />
-  <LinkCard title="Alerts and incidents" href="/docs/platform/alerts/" description="Alert rules for endpoint owners." />
-  <LinkCard title="Troubleshooting" href="/docs/self-hosting/troubleshooting/" description="What to do when a number goes wrong." />
-</CardGrid>

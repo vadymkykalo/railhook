@@ -2,9 +2,9 @@
 title: Railhook vs Convoy — MIT-licensed Convoy alternative
 description: Looking for a Convoy alternative? Railhook sends and receives webhooks under the MIT licence, with every feature self-hosted and no licence key.
 ---
-import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 
-Use this page to decide between Convoy and Railhook. Both send webhooks to your customers and receive webhooks from providers; the largest differences are the licence and what the self-hosted build includes.
+Both send webhooks to your customers and receive webhooks from providers. The largest differences are the licence and what the self-hosted build includes.
 
 <Aside title="Verified 2026-09-18">
 Convoy details come from [getconvoy.io/pricing](https://www.getconvoy.io/pricing) and [github.com/frain-dev/convoy](https://github.com/frain-dev/convoy) as they read on 18 September 2026. Products change: check them before you decide, and send a correction as a pull request if something here is out of date.
@@ -24,8 +24,6 @@ Convoy details come from [getconvoy.io/pricing](https://www.getconvoy.io/pricing
 | OpenTelemetry | No | In paid editions |
 | Role-based access control | Three fixed roles, in every build | In paid editions |
 
-A dash means Convoy's pages we checked did not settle the point. It is not a claim that the feature is missing.
-
 ## When Convoy is the better choice
 
 - **You want traces, and a paid edition is fine.** Convoy offers OpenTelemetry. Railhook exposes Prometheus metrics and no traces.
@@ -41,11 +39,3 @@ A dash means Convoy's pages we checked did not settle the point. It is not a cla
 ## Moving from Convoy
 
 Convoy's concepts carry over almost one to one: a project is a project, an endpoint an endpoint, a subscription a subscription, an event an event and a source a source. Railhook signs with the Standard Webhooks headers, so check what your receivers verify before you switch them. [Migrate to Railhook](/docs/resources/migrating/) has the mapping and a migration with both platforms live.
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Migrate to Railhook" href="/docs/resources/migrating/" description="Concept mapping and a migration with both platforms live." />
-  <LinkCard title="Organizations and roles" href="/docs/platform/organizations-rbac/" description="What Railhook's three roles can do." />
-  <LinkCard title="How Railhook compares" href="/docs/resources/comparison/" description="Railhook next to every alternative, gaps included." />
-</CardGrid>

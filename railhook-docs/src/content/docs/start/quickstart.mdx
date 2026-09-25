@@ -2,9 +2,7 @@
 title: Quickstart
 description: Get a Railhook instance, create a project and an API key, and send your first event.
 ---
-import { Steps, Tabs, TabItem, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
-
-In about ten minutes you will have a project, an API key, and an event delivered to a URL of yours, with every attempt on the record.
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 <Steps>
 
@@ -12,7 +10,7 @@ In about ten minutes you will have a project, an API key, and an event delivered
 
    <Tabs syncKey="run">
      <TabItem label="Railhook Cloud">
-       Sign up at [railhook.io/register](https://railhook.io/register). It is free right now on the Free plan: 10,000 events a month, 3 projects, 5 endpoints per project and 7 days of history. Paid plans with support and higher limits will come later.
+       Sign up at [railhook.io/register](https://railhook.io/register). The Free plan gives 10,000 events a month, 3 projects, 5 endpoints per project and 7 days of history.
 
        Your API base URL is `https://railhook.io`.
      </TabItem>
@@ -23,22 +21,22 @@ In about ten minutes you will have a project, an API key, and an event delivered
        curl -fsSL https://railhook.io/install.sh | bash
        ```
 
-       The installer checks the machine, writes a Compose file and a `.env` with generated secrets to `~/railhook`, and starts the stack. Open `http://localhost` and register. No mail server is configured yet, so the first account is active straight away.
+       The installer checks the machine, writes a Compose file and a `.env` with generated secrets to `~/railhook`, and starts the stack. Open `http://localhost` and register. With no mail server configured, the first account is active straight away.
 
-       Your API base URL is `http://localhost` — or `http://localhost:<port>` if you installed with `--port`.
+       Your API base URL is `http://localhost`, or `http://localhost:<port>` if you installed with `--port`.
      </TabItem>
    </Tabs>
 
 2. **Create a project and an API key**
 
-   In the dashboard, create a project, then open **API Keys** and create a key with the `READ_WRITE` scope. The key is shown once. Only its hash is stored, so copy it now.
+   In the dashboard, create a project, then open **API Keys** and create a key with the `READ_WRITE` scope. The key is shown once (only its hash is stored).
 
 3. **Add an endpoint and subscribe it**
 
    Open **Endpoints** and add the URL that should receive the webhook. Then open **Subscriptions** and subscribe that endpoint to the event type `order.completed`.
 
    <Aside type="caution">
-   Railhook refuses to deliver to private and internal addresses by default. Use a URL that is reachable from the public internet.
+   By default Railhook refuses private and internal addresses. Use a publicly reachable URL.
    </Aside>
 
 4. **Send an event**
@@ -108,18 +106,10 @@ In about ten minutes you will have a project, an API key, and an event delivered
      </TabItem>
    </Tabs>
 
-   Railhook answers `201` with the `eventId` and `deliveriesCreated`: one delivery per matching subscription. The sending happens afterwards, not during your request.
+   Railhook answers `201` with the `eventId` and `deliveriesCreated` (one delivery per matching subscription). Sending happens after the request returns.
 
 5. **See it delivered**
 
-   Open **Deliveries**. Each delivery shows its attempts and the status code and response body your endpoint returned. A `2xx` marks it `SUCCESS`. Anything else is retried, and a delivery that runs out of attempts moves to **Failed Messages**.
+   Open **Deliveries**. Each delivery shows its attempts with your endpoint's status code and response body. A `2xx` marks it `SUCCESS`; anything else is retried, and a delivery out of attempts moves to **Failed Messages**.
 
 </Steps>
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Send your first webhook" description="The same flow through the API, with signature checks on the receiving side." href="/docs/start/send-first-webhook/" />
-  <LinkCard title="Receive your first webhook" description="Take in webhooks from Stripe, GitHub and others and forward them to your services." href="/docs/start/receive-first-webhook/" />
-  <LinkCard title="Concepts" description="Event, endpoint, delivery, attempt: the words the rest of the docs use." href="/docs/start/concepts/" />
-</CardGrid>

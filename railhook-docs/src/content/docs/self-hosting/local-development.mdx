@@ -2,9 +2,9 @@
 title: Local development
 description: Build and run Railhook from a clone of the repository, and iterate on one service at a time.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
-This page is for working on Railhook itself. It builds the API, worker and dashboard from your working tree and runs them in the same one-port layout as a real deployment.
+For working on Railhook itself: the API, worker and dashboard are built from your working tree and run in the same one-port layout as a real deployment.
 
 ## Prerequisites
 
@@ -107,10 +107,3 @@ make test-ui                              # dashboard unit tests
 cd railhook-ui && npm run lint && npm run typecheck
 mvn clean compile -B
 ```
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Configuration" description="Every variable in .env." href="/docs/self-hosting/configuration/" />
-  <LinkCard title="Monitoring" description="Start Prometheus and Grafana next to the stack." href="/docs/self-hosting/monitoring/" />
-</CardGrid>

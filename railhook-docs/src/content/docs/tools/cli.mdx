@@ -2,7 +2,7 @@
 title: CLI
 description: Install the Railhook CLI, receive webhooks on localhost through a tunnel, and read events and replays from a terminal.
 ---
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 
 The `railhook` CLI opens a tunnel from a public URL to a port on your machine, so the code handling a webhook can run locally. It also lists events and starts replays from the terminal.
 
@@ -22,7 +22,7 @@ The `railhook` CLI opens a tunnel from a public URL to a port on your machine, s
    railhook login --server https://railhook.io   # or your own instance, e.g. http://localhost or https://hooks.example.com
    ```
 
-   This prints a URL and a code. Approve it in the browser, and no password is typed into the terminal. For scripts, use `railhook login --email you@example.com --password` instead, and the password is prompted for.
+   This prints a URL and a code. Approve it in the browser, no password goes into the terminal. For scripts there is `railhook login --email you@example.com --password`, which prompts for the password.
 
 3. **Open a tunnel**
 
@@ -30,7 +30,9 @@ The `railhook` CLI opens a tunnel from a public URL to a port on your machine, s
    railhook listen 3000
    ```
 
-   The CLI prints a public URL and forwards every request that reaches it to `http://localhost:3000`, then returns your response. The URL is a base: a path after it is kept, so `https://<host>/tunnel/<slug>/webhooks/stripe` reaches `http://localhost:3000/webhooks/stripe`. Use it as an endpoint while you develop. The body reaches your app byte for byte, as the provider sent it, so your own signature check passes for form posts and binary bodies too, and your response goes back the same way. If the connection drops, the CLI reconnects to the same URL; a request already sent to your machine when it dropped is answered `502` straight away rather than after the 30-second timeout. Press Ctrl+C to close it.
+   The CLI prints a public URL and forwards each request to `http://localhost:3000`, then returns your response. A path after the URL is kept: `https://<host>/tunnel/<slug>/webhooks/stripe` reaches `http://localhost:3000/webhooks/stripe`.
+
+   The body arrives byte for byte, so your own signature check passes for form posts and binary bodies too. If the connection drops, the CLI reconnects to the same URL, and a request in flight at that moment is answered `502` at once instead of after the 30-second timeout. Ctrl+C closes the tunnel.
 
 </Steps>
 
@@ -90,11 +92,3 @@ The CLI stores the server URL, tokens and active project in `~/.config/railhook/
 | Connection refused while tunnelling | Nothing is listening on the local port you gave `listen` |
 | A signature check fails only for gzip or other binary bodies through the tunnel | Your CLI predates byte-exact bodies. Re-run the install command to update it |
 | Repeated `401` | Tokens refresh on their own. If it keeps happening, run `railhook login` again |
-
-## Next steps
-
-<CardGrid>
-  <LinkCard title="Replay" description="What a replay creates, and when to use one." href="/docs/outgoing/replay/" />
-  <LinkCard title="SDKs" description="Send events from your code." href="/docs/tools/sdks/" />
-  <LinkCard title="MCP server" description="Let an AI agent inspect deliveries and replay them." href="/docs/tools/mcp/" />
-</CardGrid>
