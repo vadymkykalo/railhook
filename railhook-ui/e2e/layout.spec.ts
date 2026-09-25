@@ -89,18 +89,22 @@ test.describe('the landing page on a phone', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('the install command stays on one line and scrolls instead of breaking inside the URL', async ({ page }) => {
+  test('the install commands scroll instead of wrapping inside the URL', async ({ page }) => {
     const box = page.getByTestId('install-command');
     await expect(box).toBeVisible();
-    const m = await box.evaluate((el) => ({
-      height: el.getBoundingClientRect().height,
-      lineHeight: parseFloat(getComputedStyle(el).lineHeight),
-      whiteSpace: getComputedStyle(el).whiteSpace,
-      overflowX: getComputedStyle(el).overflowX,
-    }));
+    const m = await box.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return {
+        contentHeight: el.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom),
+        lineHeight: parseFloat(style.lineHeight),
+        lines: (el.textContent ?? '').replace(/\n+$/, '').split('\n').length,
+        whiteSpace: style.whiteSpace,
+        overflowX: style.overflowX,
+      };
+    });
     expect(m.whiteSpace).toBe('pre');
     expect(m.overflowX).toMatch(/auto|scroll/);
-    expect(m.height).toBeLessThan(m.lineHeight * 2);
+    expect(m.contentHeight).toBeLessThan(m.lineHeight * (m.lines + 1));
   });
 
   test('every button and non-inline link is at least 40px tall', async ({ page }) => {
