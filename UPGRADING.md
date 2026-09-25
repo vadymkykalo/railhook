@@ -14,6 +14,9 @@ Only the releases that need something from you are listed. Everything else upgra
   ```
 
   To update the stack, download `monitoring/` for the new release and run `up -d` the same way.
+
+## v2.29.0
+
 - An Endpoint or incoming Destination that accepted nothing for 72 hours (at least 10 failed
   attempts) is now disabled, and its queued deliveries go to Failed Messages. To keep the old
   behaviour, set `ENDPOINT_AUTO_DISABLE_ENABLED=false` for both api and worker.
