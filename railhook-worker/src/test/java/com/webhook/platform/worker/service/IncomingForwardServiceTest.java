@@ -44,44 +44,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-/**
- * Covers the Incoming {@link com.webhook.platform.worker.attempt.IncomingAttemptStore} through
- * the service that drives it: the three claim paths and their {@code started_at} fence, the
- * per-attempt row model, successor insertion, and the transformation resolution.
- *
- * <p>As with the Outgoing suite, the attempt policy itself lives in
- * {@link com.webhook.platform.worker.attempt.AttemptRunner} and is pinned by
- * {@code AttemptRunnerTest}. What is here is adapter coverage and has nowhere else to live.
- */
 
-/**
- * Tests for the claim-based idempotency logic in IncomingForwardService.
- *
- * Verifies that:
- *   - First dispatch claims the existing PENDING row (created by IngressService)
- *     via atomic UPDATE, instead of INSERT-ing a duplicate.
- *   - Retry dispatch uses the attemptNumber from the scheduler message directly,
- *     without re-claiming (scheduler already set PROCESSING).
- *   - SSRF failures claim-then-update the existing row instead of INSERT-ing.
- *   - Duplicate Kafka deliveries are safely idempotent (claim returns 0 -> skip).
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class IncomingForwardServiceTest {
 
-    /**
-     * The claim_token the store generated for the claim under test (V060).
-     *
-     * <p>Against a real database the claiming UPDATE writes this onto the row, so the read
-     * that {@code finalise} performs finds it there and the fence matches. With a mocked
-     * repository nothing carries it across, so {@link #stampClaimToken} does what the UPDATE
-     * would have done — otherwise every fixture row looks like one that was reclaimed by a
-     * stuck sweep, and finalise correctly refuses to write it.</p>
-     */
+    // A mocked repository carries no token across, so stampClaimToken does what the claiming UPDATE would.
     private final java.util.concurrent.atomic.AtomicReference<UUID> claimedToken =
             new java.util.concurrent.atomic.AtomicReference<>();
 
-    /** Returns the row as the claiming UPDATE would have left it. */
     private List<IncomingForwardAttempt> asClaimed(IncomingForwardAttempt attempt) {
         if (attempt.getStatus() == ForwardAttemptStatus.PROCESSING && attempt.getClaimToken() == null) {
             attempt.setClaimToken(claimedToken.get());
@@ -113,8 +84,7 @@ class IncomingForwardServiceTest {
     @Mock
     private KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate;
 
-    // Incoming Destinations carry no per-target rate limit, so the Runner never consults
-    // this one for this direction. Present only to satisfy its constructor.
+    // Incoming Destinations have no per-target rate limit; present only for the constructor.
     @Mock
     private RedisRateLimiterService redisRateLimiterService;
 
@@ -143,7 +113,6 @@ class IncomingForwardServiceTest {
         // Nobody else is writing: the row lock finds the row as the read left it.
         lenient().when(attemptRepository.holdIfStillClaimed(any(), any(), any())).thenReturn(1);
 
-        // Tenant isolation guards — permissive by default
         when(projectRateLimiterService.tryAcquire(any(UUID.class))).thenReturn(true);
         when(circuitBreakerService.isCallPermitted(any(UUID.class))).thenReturn(true);
         when(concurrencyControlService.tryAcquireForTenant(any(UUID.class))).thenReturn(true);
@@ -162,11 +131,7 @@ class IncomingForwardServiceTest {
     }
 
 
-    /**
-     * A real AttemptRunner over the same mocks the service used to hold directly. The attempt
-     * lifecycle these tests describe now lives in the Runner, so exercising it through the
-     * service means wiring a real one rather than a mock.
-     */
+    // The attempt lifecycle lives in the Runner, so wire a real one.
     private AttemptRunner newAttemptRunner(boolean allowPrivateIps) {
         return new AttemptRunner(
                 projectRateLimiterService, redisRateLimiterService, concurrencyControlService,
@@ -192,8 +157,6 @@ class IncomingForwardServiceTest {
                 .retryableStatuses(RetryableStatuses.DEFAULT_SPEC)
                 .build();
     }
-
-    // -- First dispatch: claims existing PENDING row --
 
     @Test
     void firstDispatch_claimsExistingPendingRow_notInsert() {
@@ -228,11 +191,8 @@ class IncomingForwardServiceTest {
         service.processForward(message);
 
         verify(attemptRepository).claimForProcessing(eq(eventId), eq(destinationId), eq(1), isNull(), any(UUID.class));
-        // Should not proceed to HTTP call
         verify(attemptRepository, never()).findForwardAttempts(any(), any(), any());
     }
-
-    // -- Retry dispatch: scheduler already claimed, no re-claim --
 
     @Test
     void retryDispatch_usesAttemptCountDirectly_noReClaim() {
@@ -246,16 +206,13 @@ class IncomingForwardServiceTest {
 
         service.processForward(message);
 
-        // Must NOT call claimForProcessing -- scheduler already did it
+        // The scheduler already claimed it.
         verify(attemptRepository, never()).claimForProcessing(any(), any(), anyInt(), any(), any());
     }
 
-    // -- duplicate Kafka delivery of a retry message must not double-POST --
-
     @Test
     void retryMessageWithoutFencingToken_legacyProducer_stillDispatches() {
-        // Rolling-deploy compatibility: a message published before the startedAt field
-        // existed (null) must not be silently dropped -- fall back to the old behavior.
+        // A message from before startedAt existed must not be dropped during a rolling deploy.
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
         when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(buildDestination()));
 
@@ -268,27 +225,18 @@ class IncomingForwardServiceTest {
         service.processForward(message);
 
         verify(attemptRepository, never()).claimRetryForProcessing(any(), any(), anyInt(), any(), any(), any());
-        // Guard chain must have been entered -- proves attemptForward ran.
         verify(concurrencyControlService).tryAcquireForTarget(destinationId);
     }
 
     @Test
     void duplicateRetryMessage_secondDeliveryFailsClaim_neverEntersDispatch() {
-        // Reproduces the duplicate-delivery scenario: IncomingForwardRetryScheduler publishes a retry message,
-        // the Kafka offset commit is lost on a rebalance (ordinary at-least-once), the
-        // record is re-consumed, and both copies call processForward with an identical
-        // message (same fencing token). Without the CAS claim, both would see
-        // status=PROCESSING and both would call attemptForward, POSTing twice to the
-        // destination. With the CAS, only the delivery that still matches the token
-        // proceeds -- the duplicate is rejected before the guard chain (and therefore
-        // before the HTTP call) even starts.
+        // A lost offset commit re-consumes the retry message; without the CAS both copies would POST.
         Instant fencingToken = Instant.now();
 
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
         when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(buildDestination()));
 
-        // First delivery wins the CAS; the redelivered duplicate finds the token already
-        // consumed (started_at moved on) and updates 0 rows.
+        // The duplicate finds started_at moved on and updates 0 rows.
         when(attemptRepository.claimRetryForProcessing(eq(eventId), eq(destinationId), eq(2), isNull(), eq(fencingToken), any(UUID.class)))
                 .thenReturn(1)
                 .thenReturn(0);
@@ -299,18 +247,14 @@ class IncomingForwardServiceTest {
                 .startedAt(fencingToken)
                 .build();
 
-        // Simulate the exact same Kafka record being delivered twice.
         service.processForward(message);
         service.processForward(message);
 
         verify(attemptRepository, times(2))
                 .claimRetryForProcessing(eq(eventId), eq(destinationId), eq(2), isNull(), eq(fencingToken), any(UUID.class));
-        // Only the winning delivery must reach the dispatch guard chain -- i.e. exactly
-        // one attempt to acquire a concurrency permit, which is what gates the HTTP POST.
+        // One permit acquisition is what gates the HTTP POST.
         verify(concurrencyControlService, times(1)).tryAcquireForTarget(destinationId);
     }
-
-    // -- SSRF failure: claim + update, not INSERT --
 
     @Test
     void ssrfFailure_claimsAndUpdatesExistingRow() {
@@ -329,7 +273,7 @@ class IncomingForwardServiceTest {
         when(attemptRepository.findForwardAttempts(eventId, destinationId, null))
                 .thenAnswer(inv -> asClaimed(existingAttempt));
 
-        // Re-create service with allowPrivateIps=false for SSRF to trigger
+        // allowPrivateIps=false so the SSRF check triggers.
         IncomingForwardService ssrfService = newService(
                 WebClient.builder().build(), new SimpleMeterRegistry(), newAttemptRunner(false));
 
@@ -351,8 +295,6 @@ class IncomingForwardServiceTest {
         assertThat(saved.getErrorMessage()).contains("SSRF_PROTECTION");
     }
 
-    // -- Edge cases --
-
     @Test
     void eventNotFound_skips() {
         when(eventRepository.findById(eventId)).thenReturn(Optional.empty());
@@ -367,11 +309,7 @@ class IncomingForwardServiceTest {
         verify(attemptRepository, never()).claimForProcessing(any(), any(), anyInt(), any(), any());
     }
 
-    /**
-     * A disabled Destination is decided under the Claim, like every other terminal outcome.
-     * This used to be checked here, before anything was claimed, so it wrote FAILED over
-     * whatever else owned the row.
-     */
+    // Checked before the claim, it wrote FAILED over whatever else owned the row.
     @Test
     void destinationDisabled_failsTheAttemptUnderItsClaim() {
         IncomingDestination dest = buildDestination();
@@ -403,9 +341,6 @@ class IncomingForwardServiceTest {
         assertThat(captor.getValue().getErrorMessage()).isEqualTo("Destination is disabled");
     }
 
-    // -- a configured transformation that fails must fail the attempt, never forward
-    // the raw body. --
-
     @Test
     void configuredTransformationMissing_failsAttemptAsRetryable_doesNotForwardRawBody() {
         IncomingDestination dest = buildDestination();
@@ -414,7 +349,7 @@ class IncomingForwardServiceTest {
 
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
         when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(dest));
-        // Simulates the transformation being deleted or disabled after being configured.
+        // Deleted or disabled after being configured.
         when(transformationCacheService.findEnabledTemplate(transformationId)).thenReturn(null);
 
         IncomingForwardAttempt existingAttempt = IncomingForwardAttempt.builder()
@@ -429,7 +364,6 @@ class IncomingForwardServiceTest {
         IncomingForwardService localService = newService(
                 mockWebClient, meterRegistry, newAttemptRunner(true));
 
-        // Retry dispatch: scheduler already claimed the row, no re-claim needed.
         IncomingForwardMessage message = IncomingForwardMessage.builder()
                 .incomingEventId(eventId).destinationId(destinationId)
                 .incomingSourceId(sourceId).attemptCount(2).replay(false)
@@ -437,8 +371,7 @@ class IncomingForwardServiceTest {
 
         localService.processForward(message);
 
-        // No HTTP call must have been attempted -- the raw (untransformed) body must never
-        // reach the destination.
+        // The raw, untransformed body must never reach the destination.
         verifyNoInteractions(mockWebClient);
         verifyNoInteractions(payloadTransformService);
 
@@ -446,14 +379,13 @@ class IncomingForwardServiceTest {
         verify(attemptRepository, times(2)).save(captor.capture());
         List<IncomingForwardAttempt> saved = captor.getAllValues();
 
-        // FAILED (not DLQ) because attemptNumber (2) < maxAttempts (5) -- retryable.
+        // FAILED, not DLQ: attempt 2 of 5 is retryable.
         IncomingForwardAttempt failedUpdate = saved.stream()
                 .filter(a -> a.getStatus() == ForwardAttemptStatus.FAILED)
                 .findFirst().orElseThrow();
         assertThat(failedUpdate.getErrorMessage()).contains("TRANSFORM_FAILED");
         assertThat(failedUpdate.getResponseCode()).isNull();
 
-        // A retry attempt must have been scheduled -- this is a retryable failure, not terminal.
         assertThat(saved.stream().anyMatch(a -> a.getStatus() == ForwardAttemptStatus.PENDING
                 && a.getAttemptNumber() == 3)).isTrue();
 
@@ -482,7 +414,7 @@ class IncomingForwardServiceTest {
         IncomingForwardService localService = newService(
                 mockWebClient, new SimpleMeterRegistry(), newAttemptRunner(true));
 
-        // attemptCount == maxAttempts -- this is the last attempt.
+        // The last attempt.
         IncomingForwardMessage message = IncomingForwardMessage.builder()
                 .incomingEventId(eventId).destinationId(destinationId)
                 .incomingSourceId(sourceId).attemptCount(2).replay(false)
@@ -495,7 +427,6 @@ class IncomingForwardServiceTest {
         ArgumentCaptor<IncomingForwardAttempt> captor = ArgumentCaptor.forClass(IncomingForwardAttempt.class);
         verify(attemptRepository).save(captor.capture());
         IncomingForwardAttempt saved = captor.getValue();
-        // A permanently broken template must terminate at DLQ, not retry forever.
         assertThat(saved.getStatus()).isEqualTo(ForwardAttemptStatus.DLQ);
         assertThat(saved.getErrorMessage()).contains("Max attempts reached");
     }
@@ -539,12 +470,7 @@ class IncomingForwardServiceTest {
         assertThat(failedUpdate.getErrorMessage()).contains("TRANSFORM_FAILED");
     }
 
-    /**
-     * The finalizers must refuse a row that is no longer PROCESSING. Before the guard, a
-     * late writer -- a timed-out call whose 2xx had already landed, or a duplicate Kafka
-     * redelivery -- overwrote the terminal row AND created a PENDING successor, forwarding
-     * the same event twice.
-     */
+    // A late writer once overwrote the terminal row and queued a successor, forwarding twice.
     @Test
     void updateAttempt_rowAlreadyTerminal_doesNotOverwriteAndDoesNotScheduleSuccessor() {
         IncomingForwardAttempt alreadySucceeded = IncomingForwardAttempt.builder()
@@ -576,13 +502,9 @@ class IncomingForwardServiceTest {
         assertThat(alreadySucceeded.getStatus()).isEqualTo(ForwardAttemptStatus.SUCCESS);
     }
 
-    // -- an unusable retry ladder is a terminal configuration failure, not a retry --
-
     @Test
     void malformedRetryLadder_failsTerminallyWithoutForwarding() {
-        // Mirrors WebhookDeliveryServiceTest: retrying cannot fix a ladder that does not
-        // parse, and letting RetryLadder throw from calculateNextRetry after the HTTP call
-        // would leave the row PROCESSING for StuckForwardRecovery to hand back, forever.
+        // Retrying cannot fix an unparseable ladder; throwing after the call would leave the row PROCESSING forever.
         IncomingDestination destination = buildDestination();
         destination.setRetryDelays("60,oops,900");
 
@@ -617,13 +539,9 @@ class IncomingForwardServiceTest {
         verify(concurrencyControlService, never()).tryAcquireForTarget(destinationId);
     }
 
-    // -- a Forward whose ladder is exhausted announces itself --
-
     @Test
     void ladderExhausted_publishesDlqNotification() {
-        // Before this, a DLQ'd Forward wrote its row status and nothing else: incoming.forward.dlq
-        // existed and was created by the Makefile, but nothing ever produced a business
-        // notification to it.
+        // A DLQ'd Forward once wrote its status and never produced the dlq notification.
         IncomingDestination destination = buildDestination();
         destination.setMaxAttempts(1); // exhausted by the first failure
 
@@ -637,8 +555,7 @@ class IncomingForwardServiceTest {
                 .attemptNumber(1).status(ForwardAttemptStatus.PROCESSING)
                 .build();
         when(attemptRepository.findForwardAttempts(eventId, destinationId, null)).thenAnswer(inv -> asClaimed(claimed));
-        // Nothing is listening on the destination URL, so the attempt errors and, with
-        // maxAttempts=1, is abandoned rather than retried.
+        // Nothing listens there, so with maxAttempts=1 the attempt is abandoned.
         destination.setUrl("http://127.0.0.1:1/hook");
 
         IncomingForwardMessage message = IncomingForwardMessage.builder()
@@ -682,8 +599,6 @@ class IncomingForwardServiceTest {
                 any(IncomingForwardMessage.class));
     }
 
-    // -- The fence: a reclaimed row belongs to somebody else --
-
     @Test
     void attemptReclaimedMidFlight_doesNotFinaliseOrQueueASuccessor() {
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
@@ -691,9 +606,7 @@ class IncomingForwardServiceTest {
         when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), isNull(), any(UUID.class)))
                 .thenAnswer(inv -> { claimedToken.set(inv.getArgument(4)); return 1; });
 
-        // The row as it looks by the time this attempt finishes: PROCESSING again, but under
-        // a *different* token — StuckForwardRecoveryService handed it back and the scheduler
-        // re-claimed it while this POST was still in flight.
+        // PROCESSING again under a different token: recovered and re-claimed while this POST was in flight.
         IncomingForwardAttempt reclaimed = IncomingForwardAttempt.builder()
                 .id(UUID.randomUUID()).incomingEventId(eventId).destinationId(destinationId)
                 .attemptNumber(1).status(ForwardAttemptStatus.PROCESSING)
@@ -707,10 +620,7 @@ class IncomingForwardServiceTest {
                 .incomingSourceId(sourceId).attemptCount(0).replay(false)
                 .build());
 
-        // The status guard alone would have passed here — the row *is* PROCESSING — and this
-        // attempt would have written its own outcome over somebody else's claim. Being
-        // retryable, it would then have queued attempt 2 as well, so the destination receives
-        // the same webhook a third time while the concurrent attempt's result is thrown away.
+        // The status guard alone would pass; only the fence stops this overwriting another claim.
         assertThat(reclaimed.getStatus())
                 .as("a reclaimed row must be left exactly as its current owner left it")
                 .isEqualTo(ForwardAttemptStatus.PROCESSING);
@@ -718,20 +628,9 @@ class IncomingForwardServiceTest {
                 a != null && a.getAttemptNumber() == 2));
     }
 
-    // -- A database blip is not a reason to stop the partition --
-
     @Test
     void aFailedLookupDoesNotEscapeOntoTheConsumerThread() {
-        // processForward ran on a BoundedAsyncExecutor pool thread, and that executor treats a
-        // throw as "do not ack" on purpose — the work is not lost, it is re-polled. But with
-        // asyncAcks on, an unacked offset holds up every commit for its partition, so one
-        // transient SQLException stopped every *later* incoming event on that partition until
-        // somebody restarted the worker.
-        //
-        // The outgoing direction never had this: WebhookDeliveryService.processDelivery catches
-        // and logs, the record is acked, and the row is left to the stuck sweep and the retry
-        // ladder, which is what actually drives reprocessing here. The asymmetry was not a
-        // decision, it was an omission.
+        // A throw means "do not ack", and with asyncAcks one unacked offset stopped the whole partition.
         when(eventRepository.findById(eventId))
                 .thenThrow(new org.springframework.dao.QueryTimeoutException("statement timeout"));
 
@@ -757,7 +656,7 @@ class IncomingForwardServiceTest {
         assertThatNoException().isThrownBy(() -> service.processForward(message));
     }
 
-    /** Every Project active: whether a Project may still be sent for is not what this test is about. */
+    // Every Project active: project status is not what this test is about.
     private static ProjectStatusLookup activeProjects() {
         return new ProjectStatusLookup(null) {
             @Override

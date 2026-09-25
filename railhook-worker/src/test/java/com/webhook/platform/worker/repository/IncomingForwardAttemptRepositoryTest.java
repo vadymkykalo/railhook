@@ -26,15 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * The Replay-session scoping of the claim, against a real Postgres.
- *
- * <p>Two things here cannot be checked with a mock. A Forward created by ingress carries no Replay
- * session, so the claim compares a column against a null bind: written as {@code =} it matches
- * nothing and every ordinary Forward silently fails to claim, which is why the SQL says
- * {@code IS NOT DISTINCT FROM} and why the bind carries an explicit cast to uuid. And the
- * stranded-PENDING sweep is a native UPDATE whose predicate only means anything against real rows.
- */
+// A null replay session needs IS NOT DISTINCT FROM and an explicit uuid cast; = matches nothing.
 @DataJpaTest
 @Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -123,14 +115,9 @@ class IncomingForwardAttemptRepositoryTest {
                 "a Forward that has only just been received is still waiting for its dispatch message");
     }
 
-    // ── the hard cap measures the Forward, not the webhook ─────────────────────────
-
     @Test
     void aDlqRetryOfAWebhookReceivedDaysAgoIsNotEscalatedTheMomentItIsCreated() {
-        // Failed Messages → Retry, and Replay, both start a fresh Forward — a new session with its
-        // own attempt 1 — for an Incoming Event that may have arrived last week. Measuring age
-        // from incoming_events.received_at made that brand-new Forward look days old, so the next
-        // escalation cycle put it straight back into the DLQ before a single Attempt was made.
+        // A fresh Forward for an old Incoming Event once looked days old and went straight back to DLQ.
         UUID eventId = receivedAt(Instant.now().minus(3, ChronoUnit.DAYS));
         UUID destinationId = UUID.randomUUID();
         UUID retried = persist(eventId, destinationId, 1, UUID.randomUUID(), ForwardAttemptStatus.PENDING, null);
@@ -143,8 +130,7 @@ class IncomingForwardAttemptRepositoryTest {
 
     @Test
     void aForwardWhoseLadderBeganBeforeTheCutoffIsEscalatedEvenThoughItsNewestRowIsFresh() {
-        // Incoming writes a new row per Attempt, so the PENDING row is always recent. The age that
-        // counts is how long this Forward has been outstanding: since its own attempt 1.
+        // The age that counts is since this Forward's own attempt 1.
         UUID eventId = receivedAt(Instant.now().minus(30, ChronoUnit.HOURS));
         UUID destinationId = UUID.randomUUID();
         UUID first = persist(eventId, destinationId, 1, null, ForwardAttemptStatus.FAILED, null);
@@ -187,7 +173,6 @@ class IncomingForwardAttemptRepositoryTest {
                 "the only outstanding Forward started just now, not when its webhook arrived: " + oldest);
     }
 
-    /** The Incoming Event the attempts hang off, received at the given moment. */
     private UUID receivedAt(Instant receivedAt) {
         UUID id = UUID.randomUUID();
         entityManager.getEntityManager()

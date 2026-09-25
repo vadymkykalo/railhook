@@ -80,7 +80,6 @@ class ScopeEnforcementInterceptorTest {
         public void export() {
         }
 
-        /** The dry-run's shape: a write level, lifted for the demo because it is on the list. */
         @AllowedInDemo(reason = "test")
         @RequireAccess(AccessLevel.WRITE)
         public void allowedButDeclaresWrite() {
@@ -102,19 +101,9 @@ class ScopeEnforcementInterceptorTest {
         }
     }
 
-    /**
-     * {@code MutatingHandlerAccessDeclarationTest} proves every state-changing handler
-     * <em>declares</em> an {@link AccessLevel}. This proves the declaration is actually
-     * <em>enforced</em> — that {@link RequireAccess} is a guard and not decoration.
-     *
-     * <p>Worth separating: a ratchet over annotations passes just as happily when the interceptor
-     * that reads them has been unregistered, reordered behind an early return, or quietly stopped
-     * being called.
-     */
+    // A ratchet over annotations passes even if the interceptor is unregistered.
     @Nested
     class AccessLevelEnforcement {
-
-        // ── the declarations exist where these tests assume they do ───────────────────
 
         @Test
         @DisplayName("the handlers under test really carry the annotations this test relies on")
@@ -192,7 +181,7 @@ class ScopeEnforcementInterceptorTest {
             @Test
             @DisplayName("an unannotated handler lets a Viewer through")
             void unannotatedIsUnaffected() {
-                // AuthController.login is a documented exemption: unauthenticated by design.
+                // login is a documented exemption: unauthenticated by design.
                 HandlerMethod handler = handlerFor(AuthController.class, "login");
                 assertDoesNotThrow(() -> preHandle(handler, jwt(MembershipRole.VIEWER)));
             }
@@ -200,15 +189,7 @@ class ScopeEnforcementInterceptorTest {
             @Test
             @DisplayName("a platform-admin token is refused by a level it cannot satisfy")
             void platformAdminCannotSatisfyAMembershipLevel() {
-                // Reversed deliberately. This used to pass through, on
-                // the grounds that running RbacUtil against a platform admin would reject the one
-                // caller /api/v1/admin/** is for. That reason does not reach here: no admin handler
-                // carries @RequireAccess (EncryptionAdminController is gated on the PLATFORM_ADMIN
-                // authority in SecurityConfig), so the pass-through only ever applied to *tenant*
-                // handlers, where a platform admin is not the intended caller. It was already
-                // refused there — by AuthContextArgumentResolver, one step later, because every
-                // annotated handler happens to take an AuthContext. Refusing here means the guard
-                // no longer depends on that coincidence holding.
+                // Reversed deliberately: a platform admin is never the intended caller of a tenant handler.
                 HandlerMethod handler = handlerFor(OrganizationController.class, "deleteOrganization");
                 ForbiddenException e = assertThrows(ForbiddenException.class,
                         () -> preHandle(handler, new PlatformAdminAuthenticationToken()));
@@ -218,8 +199,7 @@ class ScopeEnforcementInterceptorTest {
             @Test
             @DisplayName("a platform-admin token still reaches the admin handlers, which declare no level")
             void platformAdminStillReachesAdminHandlers() {
-                // The blast radius of the reversal above, stated as a test: /api/v1/admin/** works
-                // because it declares nothing, not because the interceptor makes an exception.
+                // /api/v1/admin/** works because it declares nothing, not by exception.
                 HandlerMethod handler = handlerFor(EncryptionAdminController.class, "rotateEncryptionKeys");
                 assertDoesNotThrow(() -> preHandle(handler, new PlatformAdminAuthenticationToken()));
             }
@@ -239,19 +219,6 @@ class ScopeEnforcementInterceptorTest {
         }
     }
 
-    /**
-     * An API key reaches only its own project, checked by the interceptor on the real handler.
-     *
-     * <p>Worst concrete case: {@code EndpointController.rotateSecret} never called
-     * {@code AuthContext.validateProjectAccess}, and {@code EndpointService.rotateSecret} checks
-     * only organizationId — which AuthContext derives from the API key's own project, so it's the
-     * same for every project in an org. A key scoped to "staging" could rotate a "production"
-     * endpoint's signing secret and get it back in plaintext. The bug was that the handler never
-     * called validateProjectAccess at all, not that the method behaves wrong. The fix moved the
-     * check into ScopeEnforcementInterceptor, which now runs unconditionally against the actual
-     * {@code EndpointController.rotateSecret} HandlerMethod, independent of what the handler itself
-     * does. A full HTTP-level reproduction lives in ProjectScopeEnforcementIsolationTest.
-     */
     @Nested
     class ApiKeyProjectScope {
 
@@ -299,11 +266,6 @@ class ScopeEnforcementInterceptorTest {
         }
     }
 
-    /**
-     * The demo's read-only rule, as the interceptor applies it. {@code DemoSessionIntegrationTest}
-     * walks every real handler with a real demo session; this pins who counts as the demo and what
-     * the two annotations do.
-     */
     @Nested
     class DemoReadOnlyGate {
 
@@ -354,8 +316,7 @@ class ScopeEnforcementInterceptorTest {
 
         @Test
         void anyCredentialForTheDemoOrganizationIsTheDemo() throws Exception {
-            // No demo claim, an OWNER role, an API key, a portal session: however a credential for the
-            // demo organization came about, it is read-only.
+            // However a credential for the demo organization came about, it is read-only.
             JwtAuthenticationToken ownerWithoutClaim = new JwtAuthenticationToken(UUID.randomUUID(),
                     DemoTenant.ORGANIZATION_ID, MembershipRole.OWNER, true, Collections.emptyList());
             ApiKeyAuthenticationToken demoKey = new ApiKeyAuthenticationToken("k", DemoTenant.PROJECT_ID,
@@ -369,13 +330,7 @@ class ScopeEnforcementInterceptorTest {
             assertThrows(DemoReadOnlyException.class, () -> interceptor.enforceDemoReadOnly(request("POST"), write, portal));
         }
 
-        // ── The access level, for a handler the demo may call ──────────
-        //
-        // A demo session is a VIEWER, so a handler declaring WRITE refuses it however carefully
-        // @AllowedInDemo was reviewed. The level is lifted for exactly that pair — demo caller, and
-        // a handler on the frozen list — so that "the demo may call this" means what it says. The
-        // capability the level was protecting is taken off the answer instead; for the one handler
-        // this applies to, that is DemoDryRunMask.
+        // A demo VIEWER fails WRITE, so the level is lifted only for a demo caller on a listed handler.
 
         @Test
         void anAllowedHandlerIsNotThenRefusedByItsOwnWriteLevel() throws Exception {
@@ -403,21 +358,7 @@ class ScopeEnforcementInterceptorTest {
         }
     }
 
-    /**
-     * Email verification, enforced where it can actually be enforced.
-     *
-     * <p>It was a component in the dashboard. {@code VerificationGate.tsx} greys out the buttons of
-     * an account whose status is {@code PENDING_VERIFICATION}, and nothing on the server ever asked:
-     * login refuses only {@code DISABLED}, so an unverified account received an ordinary access token
-     * and could do every one of those things with curl. On a self-hosted instance that is close to
-     * harmless — mail is off by default, registration marks the account verified because an unsent
-     * email proves nothing, and the gate never engages. On anything with open registration and a
-     * free tier it is the difference between an address someone owns and an address someone typed.
-     *
-     * <p>The check hangs off {@link RequireAccess} rather than a list of paths, so it covers what
-     * writing covers and nothing else: reading stays open, which is what lets an unverified user see
-     * the dashboard telling them to check their mail.
-     */
+    // Verification was once enforced only in the dashboard; curl skipped it.
     @Nested
     class VerificationGate {
 
@@ -445,25 +386,21 @@ class ScopeEnforcementInterceptorTest {
 
         @Test
         void anUnverifiedCallerCanStillRead() throws Exception {
-            // The dashboard has to load in order to say "check your mail", and every screen that
-            // says so is a read.
+            // The dashboard must load to say "check your mail", and every such screen is a read.
             assertDoesNotThrow(
                     () -> interceptor.enforceVerifiedEmail(handler(ReadHandler.class), caller(false)));
         }
 
         @Test
         void anApiKeyIsNotSubjectToTheGate() throws Exception {
-            // A key can only exist because a verified user created one - creating it is a write.
-            // Re-asking here would mean loading the owning user on every ingest call to answer a
-            // question that was already answered at issue time.
+            // Only a verified user can have created a key, so re-asking on every ingest is wasted.
             assertDoesNotThrow(() -> interceptor.enforceVerifiedEmail(handler(WriteHandler.class),
                     apiKey(ApiKeyScope.READ_WRITE)));
         }
 
         @Test
         void anUnauthenticatedRequestIsNotThisCheckSProblem() throws Exception {
-            // enforceAccessLevel already refuses a caller with no membership role; this one must
-            // not turn that into a different, more confusing 403.
+            // enforceAccessLevel already refuses this; don't turn it into a second, confusing 403.
             assertDoesNotThrow(() -> interceptor.enforceVerifiedEmail(handler(WriteHandler.class), null));
         }
     }

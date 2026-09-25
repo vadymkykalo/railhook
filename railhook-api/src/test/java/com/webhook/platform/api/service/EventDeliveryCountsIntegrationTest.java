@@ -33,12 +33,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Every row of an event page says what became of that Event's Deliveries, however many
- * Deliveries the page's Events fanned out to and whichever page it is. The dashboard used to
- * guess this from the newest 200 Deliveries of the project, which covered neither page two nor a
- * busy page one.
- */
+// The dashboard once guessed these from the project's newest 200 Deliveries.
 class EventDeliveryCountsIntegrationTest extends AbstractIntegrationTest {
 
     private static final int EVENTS = 30;

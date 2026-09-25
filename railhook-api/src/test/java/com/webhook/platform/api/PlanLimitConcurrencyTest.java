@@ -32,15 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The Free plan's project, endpoint and member limits under concurrent creates, against a real
- * Postgres.
- *
- * <p>Each limit was a count taken by {@code @RequireQuota} before the create's transaction began,
- * with nothing held between it and the insert, so requests released together at one below the
- * limit all counted below it and all got through. Only the active-tunnel limit took the
- * organization's row lock.
- */
+// @RequireQuota once counted before the create's transaction, so concurrent creates all passed.
 @AutoConfigureMockMvc
 @TestPropertySource(properties = "billing.enabled=true")
 class PlanLimitConcurrencyTest extends AbstractIntegrationTest {

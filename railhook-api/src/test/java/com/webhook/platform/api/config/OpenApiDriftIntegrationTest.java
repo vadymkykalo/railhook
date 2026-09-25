@@ -28,46 +28,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
-/**
- * Fails when the committed {@code openapi.yaml} disagrees semantically with the
- * spec the API actually serves.
- *
- * <p>The committed file is what the published Redoc renderer and the SDK
- * contract suites read, so it must not silently drift from the live one.
- * Springdoc generates the live spec from the {@code @RestController} classes,
- * which makes this a real drift check rather than a rebuild of a hand-maintained
- * file.
- *
- * <p><b>Why the comparison is semantic.</b> A byte-for-byte diff over 246 KB of
- * generated YAML also fires on things that are not API changes at all — the
- * serializer's quoting style flipping across a springdoc/snakeyaml upgrade, and
- * key ordering, which YAML does not consider meaningful. Both produce a red
- * build that a regenerate-and-commit "fixes" without any API having changed,
- * which trains people to regenerate on red rather than read the diff. Parsing
- * both sides and comparing the resulting structures keeps the check honest: it
- * reports added, removed, and changed paths, operations, and schemas, and stays
- * quiet about formatting.
- *
- * <p>operationIds are compared like any other value — they are stable by
- * construction ({@link OperationIdNamingConfig}, guarded by
- * {@link OpenApiOperationIdTest}), so a change in one is a real API change.
- *
- * <p><b>To regenerate</b> after an intentional API change:
- * <pre>
- *   mvn test -pl railhook-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true
- * </pre>
- * then review and commit the resulting {@code openapi.yaml}.
- */
-// Three properties, three different jobs, and all three have to be on or this test
-// asserts something other than the real spec: swagger.enabled opens the path in
-// SecurityConfig, springdoc.api-docs.enabled registers the handler at all, and
-// springdoc.swagger-ui.enabled is what OpenApiConfig is @ConditionalOnProperty on — without
-// it springdoc serves its own bare default ("OpenAPI definition", v0, no securitySchemes)
-// and every difference is reported as drift.
-//
-// The last two come from the SWAGGER_ENABLED environment variable in application.yml, which
-// .env sets to false and which `make` exports into any maven it runs — so before they were
-// pinned here, `make ratchets` failed and a bare `mvn test` passed, on the same commit.
+// To regenerate: mvn test -pl railhook-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true
+// All three must be on or springdoc serves a bare default and everything reads as drift.
+// Pinned here because make exports SWAGGER_ENABLED=false into maven.
 @TestPropertySource(properties = {
         "swagger.enabled=true",
         "springdoc.api-docs.enabled=true",
@@ -76,7 +39,6 @@ import static org.assertj.core.api.Assertions.fail;
 @Tag("ratchet")
 class OpenApiDriftIntegrationTest extends AbstractIntegrationTest {
 
-    /** Cap on reported differences, so a wholesale regeneration doesn't dump thousands of lines. */
     private static final int MAX_REPORTED = 60;
 
     private static final String REGENERATE_PROPERTY = "openapi.regenerate";
@@ -91,9 +53,7 @@ class OpenApiDriftIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
-                // Explicit UTF-8: MockMvc falls back to ISO-8859-1 when the response
-                // carries no charset, which turns the spec's multi-byte characters into
-                // C1 control characters that snakeyaml then refuses to parse.
+                // Explicit UTF-8: MockMvc falls back to ISO-8859-1 without a charset.
                 .getContentAsString(StandardCharsets.UTF_8);
 
         Path committedSpec = locateCommittedSpec();
@@ -123,15 +83,7 @@ class OpenApiDriftIntegrationTest extends AbstractIntegrationTest {
         return new Yaml(new SafeConstructor(new LoaderOptions())).load(yaml);
     }
 
-    /**
-     * Drops the top-level {@code servers} block before comparing.
-     *
-     * <p>Springdoc derives it from the incoming request, so it reads
-     * {@code http://localhost} here, {@code http://localhost:8080} against a
-     * Compose stack, and the public hostname in production. It describes where a
-     * given instance is reachable, not what the API offers, so comparing it would
-     * make this test fail on where it happens to be run.
-     */
+    // servers comes from the incoming request: where this instance runs, not what the API offers.
     @SuppressWarnings("unchecked")
     private static Object withoutEnvironmentSpecificKeys(Object spec) {
         if (spec instanceof Map) {
@@ -142,10 +94,7 @@ class OpenApiDriftIntegrationTest extends AbstractIntegrationTest {
         return spec;
     }
 
-    /**
-     * Surefire runs with the working directory set to the module, but the spec lives at
-     * the repo root; accept either so the test also works when run from there.
-     */
+    // Surefire runs in the module directory, but the spec lives at the repo root.
     private static Path locateCommittedSpec() {
         Path fromModule = Path.of("..", "openapi.yaml").normalize();
         return Files.exists(fromModule) ? fromModule : Path.of("openapi.yaml");

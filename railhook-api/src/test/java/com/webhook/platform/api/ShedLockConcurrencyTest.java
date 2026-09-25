@@ -54,14 +54,7 @@ import org.springframework.test.annotation.DirtiesContext;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public class ShedLockConcurrencyTest {
 
-    /**
-     * Fixture tenant for rows inserted straight through JDBC.
-     *
-     * <p>These fixtures bypass the entity mapping (and the FK checks, via
-     * {@code session_replication_role = replica}) that would normally stamp
-     * {@code organization_id}, so they name one themselves. The value only has to be non-null and
-     * consistent — nothing here asserts on tenant confinement.
-     */
+    // JDBC fixtures bypass the entity mapping, so they stamp organization_id themselves.
     private static final UUID FIXTURE_ORG = UUID.randomUUID();
 
     @MockitoBean
@@ -134,11 +127,7 @@ public class ShedLockConcurrencyTest {
     private AtomicInteger executionCount = new AtomicInteger(0);
 
 
-    /**
-     * These two build their own {@code @SpringBootTest} rather than extending
-     * {@code AbstractIntegrationTest}, so they enter the system tenant scope themselves. They read
-     * and delete rows across organizations directly, which is exactly what that scope means.
-     */
+    // Own @SpringBootTest rather than AbstractIntegrationTest, so it enters the system scope itself.
     @BeforeEach
     void enterSystemTenantScope() {
         TenantContext.set(TenantContext.SYSTEM);
@@ -185,14 +174,6 @@ public class ShedLockConcurrencyTest {
     }
 
 
-    /**
-     * AuditLogRetentionJob went from unguarded to @SchedulerLock-wrapped because it's a
-     * cron (not fixedDelay) that could now genuinely overlap itself/across replicas once the
-     * scheduler pool is wider than 1 thread. This just proves the job still purges correctly
-     * when invoked through the ShedLock-wrapped Spring proxy - a true concurrent-overlap race
-     * test isn't practical here (the job is a single fast DELETE with nothing to observe
-     * mid-flight), and deleteByCreatedAtBefore is idempotent regardless.
-     */
     @Test
     void testAuditLogRetentionPurgesOnlyOldEntries() {
         Instant now = Instant.now();

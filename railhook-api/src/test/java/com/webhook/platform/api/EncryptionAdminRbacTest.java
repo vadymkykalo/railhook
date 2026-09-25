@@ -15,16 +15,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Encryption admin endpoints are cluster-operator operations
- * (EncryptionKeyRotationService touches every tenant's secrets, no org predicate),
- * so they must be unreachable by ordinary tenant users — including a user who is
- * OWNER of their own org, which is the exploit this test guards against.
- *
- * <p>Authorization is via the platform-admin operator credential
- * ({@code X-Platform-Admin-Token}, see {@code PlatformAdminAuthenticationFilter}),
- * completely independent of {@code MembershipRole}/org membership.
- */
 @AutoConfigureMockMvc
 class EncryptionAdminRbacTest extends AbstractIntegrationTest {
 
@@ -57,8 +47,6 @@ class EncryptionAdminRbacTest extends AbstractIntegrationTest {
     void plainUserForbiddenOnRotate() throws Exception {
         String accessToken = registerAndGetAccessToken("plain-owner-rotate@example.com");
 
-        // This user is MembershipRole.OWNER of their own freshly-created org — exactly the
-        // exploit path: OWNER-of-some-org must NOT satisfy a cluster-operator endpoint.
         mockMvc.perform(post("/api/v1/admin/encryption/rotate")
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isForbidden());
@@ -87,9 +75,7 @@ class EncryptionAdminRbacTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("a wrong admin token is rejected exactly like no token at all")
     void wrongAdminTokenForbidden() throws Exception {
-        // No Authentication ends up in the SecurityContext for an invalid admin token (same as
-        // presenting nothing), so this hits the unauthenticated path (401), not access-denied
-        // (403) — asserting 4xx either way keeps this from being coupled to that distinction.
+        // An invalid admin token may read as 401 or 403; asserting 4xx avoids coupling to that.
         mockMvc.perform(post("/api/v1/admin/encryption/rotate")
                         .header("X-Platform-Admin-Token", "not-the-real-token"))
                 .andExpect(status().is4xxClientError());
@@ -106,11 +92,6 @@ class EncryptionAdminRbacTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("the platform admin operator credential gets 200 on /rotate — rotation runs end-to-end")
     void platformAdminAllowedOnRotateEndToEnd() throws Exception {
-        // Full stack: security filter chain -> controller -> EncryptionKeyRotationService ->
-        // real ShedLock lock acquisition -> real Postgres repositories (Testcontainers), for
-        // the authorized principal. Deep per-secret rotation behavior is covered by
-        // EncryptionKeyRotationServiceTest; this confirms the authorized path actually reaches
-        // and completes the operation via HTTP, which the RBAC fix must not break.
         mockMvc.perform(post("/api/v1/admin/encryption/rotate")
                         .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN))
                 .andExpect(status().isOk());

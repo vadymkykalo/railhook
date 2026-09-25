@@ -31,16 +31,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Suspending a member, end to end: the owner's request, the row that survives it, and the door
- * that closes behind it.
- *
- * <p>The half a unit test cannot show is that the refusal is structural. Nothing in
- * {@code MemberController} or in any other endpoint asks whether the caller is suspended — the
- * membership stops being a way in at the one place a Membership becomes an authenticated context,
- * which is where a token is minted. So the assertion that matters here is on {@code /auth/login}
- * and {@code /auth/refresh}, not on the member endpoints.</p>
- */
 public class MemberSuspensionIntegrationTest extends AbstractIntegrationTest {
 
     private static final String PASSWORD = "Test1234!";
@@ -66,9 +56,7 @@ public class MemberSuspensionIntegrationTest extends AbstractIntegrationTest {
         orgId = me.getOrganization().getId();
         ownerUserId = me.getUser().getId();
 
-        // Seeded directly rather than invited, so this member belongs to exactly one
-        // organization: the login assertions below are then about the suspension and not about
-        // which of several memberships the token happened to name.
+        // Seeded directly so this member belongs to exactly one organization.
         memberEmail = "suspend-member-" + UUID.randomUUID() + "@test.com";
         User member = User.builder()
                 .email(memberEmail)
@@ -101,7 +89,7 @@ public class MemberSuspensionIntegrationTest extends AbstractIntegrationTest {
         assertEquals(MembershipStatus.DISABLED, row.getStatus());
         assertEquals(MembershipRole.DEVELOPER, row.getRole());
 
-        // Not only at the next login: the access token already in their hands stops working too.
+        // The access token already in their hands stops working too.
         verify(tokenBlacklistService).revokeAllUserTokens(memberUserId);
 
         login(memberEmail, PASSWORD).andExpect(status().isForbidden());
@@ -171,15 +159,13 @@ public class MemberSuspensionIntegrationTest extends AbstractIntegrationTest {
                 .status(MembershipStatus.ACTIVE)
                 .build());
 
-        // Two owners, so suspending one is allowed: one who can still sign in is left.
+        // Two owners, so suspending one is allowed.
         mockMvc.perform(post("/api/v1/orgs/" + orgId + "/members/" + secondOwner.getId() + "/suspend")
                         .header("Authorization", "Bearer " + ownerToken))
                 .andExpect(status().isOk());
         login(secondOwnerEmail, PASSWORD).andExpect(status().isForbidden());
 
-        // The remaining owner is now the last one who can administer anything, so removing them
-        // is refused. Counting owner rows flatly would have allowed it and left an organization
-        // whose only owner is suspended — with nobody able to lift the suspension.
+        // Counting owner rows flatly would leave an org whose only owner is suspended.
         mockMvc.perform(delete("/api/v1/orgs/" + orgId + "/members/" + ownerUserId)
                         .header("Authorization", "Bearer " + ownerToken))
                 .andExpect(status().isConflict());

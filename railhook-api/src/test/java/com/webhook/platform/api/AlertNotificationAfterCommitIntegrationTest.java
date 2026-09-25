@@ -29,14 +29,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-/**
- * An alert's notification leaves only once the alert is stored.
- *
- * <p>{@code fireAlert} used to call the notifier in the middle of its transaction, before the
- * incident rows were written. When anything after that call failed, the alert event rolled back
- * and the Slack message, email or webhook had already gone; the rule was still un-alerted, so the
- * next evaluation a minute later sent it again.
- */
 class AlertNotificationAfterCommitIntegrationTest extends AbstractIntegrationTest {
 
     @MockitoBean
@@ -96,8 +88,7 @@ class AlertNotificationAfterCommitIntegrationTest extends AbstractIntegrationTes
     void anAlertThatCommits_notifiesOnce_andTheNotifierCanAlreadySeeIt() {
         AtomicLong visibleWhenDispatched = new AtomicLong(-1);
         doAnswer(inv -> {
-            // A connection of its own, outside the transaction that wrote the alert: it sees
-            // only what has been committed.
+            // Its own connection, outside the alert's transaction: it sees only committed rows.
             visibleWhenDispatched.set(storedAlerts());
             return null;
         }).when(notificationService).dispatch(any(), any());

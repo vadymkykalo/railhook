@@ -24,19 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-/**
- * Two schema-level guarantees that only a real Postgres can prove, so they live in one
- * class rather than paying two context restarts:
- *
- * <ul>
- *   <li>{@code rules.conditions} and {@code rule_actions.config} are {@code jsonb} columns.
- *       Without {@code @JdbcTypeCode(SqlTypes.JSON)} the driver binds them as varchar and
- *       Postgres refuses the insert, which made every rule creation fail with a 500.</li>
- *   <li>A replay re-delivers an event that already has a delivery for the same subscription.
- *       The unique index has to leave room for that while still rejecting a duplicate inside
- *       one replay session.</li>
- * </ul>
- */
+// Without @JdbcTypeCode(SqlTypes.JSON) the jsonb columns bind as varchar and inserts fail.
 class RuleAndReplayPersistenceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private RuleRepository ruleRepository;

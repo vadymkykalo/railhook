@@ -86,7 +86,6 @@ class OutgoingAttemptStoreTest {
                 DeliveryMessage.builder().deliveryId(DELIVERY_ID).build(), false);
     }
 
-    /** A store wired with every collaborator, for the paths that claim and build a request. */
     private OutgoingAttemptStore storeFor(DeliveryMessage message, boolean retry, ObjectMapper objectMapper) {
         return new OutgoingAttemptStore(
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
@@ -98,7 +97,7 @@ class OutgoingAttemptStoreTest {
                 Clock.systemUTC(), 5, message, retry);
     }
 
-    /** Every Project active: whether a Project may still be sent for is not what this test is about. */
+    // Every Project active: project status is not what this test is about.
     private static ProjectStatusLookup activeProjects() {
         return new ProjectStatusLookup(null) {
             @Override
@@ -220,12 +219,7 @@ class OutgoingAttemptStoreTest {
         return captor.getValue();
     }
 
-    /**
-     * What an Attempt records as its request headers is what went out. The docs promise
-     * {@code X-Sequence-Number} and {@code Idempotency-Key} on every delivery, and they were sent,
-     * but the attempt record was assembled by hand beside the request and left both out — so the
-     * dashboard showed a request without the two headers a receiver deduplicates and orders on.
-     */
+    // The attempt record was once assembled by hand and missed X-Sequence-Number and Idempotency-Key.
     @Nested
     @MockitoSettings(strictness = Strictness.LENIENT)
     class OutgoingRequestHeaders {
@@ -301,8 +295,6 @@ class OutgoingAttemptStoreTest {
             assertThat(sent.recorded().get("webhook-signature")).isNotEqualTo(sent.headers().get("webhook-signature"));
         }
 
-        // ─── helpers ─────────────────────────────────────────────────────────
-
         private void assertEveryHeaderSentIsRecorded(Sent sent) {
             assertThat(sent.recorded().keySet()).containsAll(sent.headers().keySet());
             sent.headers().forEach((name, value) -> {
@@ -361,21 +353,7 @@ class OutgoingAttemptStoreTest {
         }
     }
 
-    /**
-     * Only one delivery of a retry message may dispatch.
-     *
-     * <p>The retry path does not claim PENDING -&gt; PROCESSING — RetrySchedulerService already
-     * did that before publishing — so it used to read the row, check the status, and take the
-     * fencing token straight out of it. That makes the token worthless as a fence: every copy of
-     * the message finds the same value and agrees it owns the row.</p>
-     *
-     * <p>Two things produce a second copy. Kafka is at-least-once, so a rebalance that loses an
-     * offset commit replays the message. And "Send confirmation timeout" in the scheduler hands
-     * the row back as PENDING with a null token while the send may still land; the next poll
-     * re-claims under a fresh token and publishes again, and the late message then adopted that
-     * fresh token and dispatched next to it. Either way two POSTs went out, only the first
-     * finalisation applied, and the second webhook left no trace at all.</p>
-     */
+    // Reading the fence off the row let every copy of a retry message believe it owned the row.
     @Nested
     @MockitoSettings(strictness = Strictness.LENIENT)
     class OutgoingRetryClaim {
@@ -405,7 +383,6 @@ class OutgoingAttemptStoreTest {
                     .build();
         }
 
-        /** The row as the consumer finds it: claimed by the scheduler and still PROCESSING. */
         private Delivery processingRow() {
             return Delivery.builder()
                     .id(deliveryId)
@@ -417,8 +394,7 @@ class OutgoingAttemptStoreTest {
 
         @Test
         void aSecondDeliveryOfTheSameRetryMessageClaimsNothing() {
-            // The first copy has already won the swap, so the row no longer carries the token
-            // this message was published with and the CAS matches nothing.
+            // The first copy won the swap, so this token matches nothing.
             when(deliveryRepository.claimRetryForProcessing(eq(deliveryId), eq(schedulerToken), any(UUID.class)))
                     .thenReturn(null);
 
@@ -427,21 +403,16 @@ class OutgoingAttemptStoreTest {
 
             assertInstanceOf(ClaimResult.NotClaimed.class, result,
                     "the loser of the CAS must not go on to POST the webhook a second time");
-            // The mechanism, not just the outcome: the claim has to be decided by a conditional
-            // swap on the published token. Deriving the fence from the row — which is what
-            // findById is for here — is the bug, because every copy of the message finds the
-            // same value there and every copy concludes it owns the row.
+            // The claim must be a conditional swap on the published token, never a fence read off the row.
             verify(deliveryRepository).claimRetryForProcessing(eq(deliveryId), eq(schedulerToken), any(UUID.class));
             verify(deliveryRepository, never()).findById(deliveryId);
         }
 
         @Test
         void aMessageCarryingAStaleTokenClaimsNothing() {
-            // The scheduler timed out waiting for this send, handed the row back, and the next
-            // poll re-claimed it under a different token — then this send landed after all.
+            // The scheduler timed out, handed the row back and re-claimed it; then this send landed.
             UUID staleToken = UUID.randomUUID();
-            // The row is PROCESSING under the *new* token. The old code would have read that,
-            // adopted it as its fence, and dispatched next to the freshly published message.
+            // PROCESSING under the new token.
             when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(processingRow()));
             when(deliveryRepository.claimRetryForProcessing(eq(deliveryId), eq(staleToken), any(UUID.class)))
                     .thenReturn(null);
@@ -450,15 +421,12 @@ class OutgoingAttemptStoreTest {
                     retryStoreFor(retryMessage(staleToken)).claim();
 
             assertInstanceOf(ClaimResult.NotClaimed.class, result);
-            // Reading the fence from the row is exactly the bug: it would have found the *new*
-            // token, agreed the row was PROCESSING, and dispatched alongside the fresh message.
             verify(deliveryRepository, never()).findById(deliveryId);
         }
 
         @Test
         void aMessageWithoutATokenStillWorksAcrossARollingDeploy() {
-            // Published by a worker from before the token travelled with the message. Dropping
-            // these would strand every retry already in flight during the upgrade.
+            // From a worker before the token travelled with the message; dropping these strands in-flight retries.
             Delivery delivery = Delivery.builder()
                     .id(deliveryId)
                     .status(Delivery.DeliveryStatus.PROCESSING)
@@ -471,8 +439,7 @@ class OutgoingAttemptStoreTest {
             ClaimResult<OutgoingAttemptStore.Claim> result =
                     retryStoreFor(retryMessage(null)).claim();
 
-            // It gets past the claim on the old terms; it stops later, at the missing endpoint.
-            // atLeastOnce: finalising the terminal outcome re-reads the row under its fence.
+            // Finalising re-reads the row under its fence, hence atLeastOnce.
             verify(deliveryRepository, atLeastOnce()).findById(deliveryId);
             verify(deliveryRepository, never()).claimRetryForProcessing(any(), any(), any());
             assertInstanceOf(ClaimResult.NotClaimed.class, result);

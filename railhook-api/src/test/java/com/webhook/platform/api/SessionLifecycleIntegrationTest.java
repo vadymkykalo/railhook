@@ -23,17 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The session lifecycle against a real database.
- *
- * <p>The unit tests pin the decisions; this pins the wiring, which is where a session feature
- * built on top of stateless JWTs goes wrong. In particular: the {@code user_sessions} row is
- * inserted with a caller-assigned id (it has to be — the id is the {@code sid} claim of the very
- * token being minted, so it exists before the row does), the jti actually rotates on refresh,
- * and a revoked row refuses the next refresh <em>without</em> Redis, which is mocked out here.
- * That last one is the point of keeping a durable half at all: a Redis flush must not silently
- * un-revoke every session anybody signed out.
- */
+// Redis is mocked here, so a revoked session must be refused by the durable row alone.
 @AutoConfigureMockMvc
 public class SessionLifecycleIntegrationTest extends AbstractIntegrationTest {
 
@@ -77,8 +67,7 @@ public class SessionLifecycleIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        /* Any access token can read this list, so it must not be a place a stolen short-lived
-           credential can be traded up for a long-lived one. */
+        // Any access token can read this list, so it must never expose a refresh jti.
         assertThat(body).doesNotContain(storedJti);
         assertThat(body).doesNotContain(tokens.getRefreshToken());
     }
@@ -120,9 +109,7 @@ public class SessionLifecycleIntegrationTest extends AbstractIntegrationTest {
                         .cookie(new Cookie("refresh_token", supersededToken)))
                 .andExpect(status().isOk());
 
-        /* TokenBlacklistService is a mock here and answers "not blacklisted" to everything, so
-           the only thing standing between a replayed token and a fresh pair is the session row
-           no longer naming its jti. That is exactly the situation after a Redis restart. */
+        // The blacklist mock answers "not blacklisted", as after a Redis restart.
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .cookie(new Cookie("refresh_token", supersededToken)))
                 .andExpect(status().isUnauthorized());
@@ -152,9 +139,7 @@ public class SessionLifecycleIntegrationTest extends AbstractIntegrationTest {
         AuthResponse attacker = register("session-lifecycle-attacker@example.com");
         UUID victimSessionId = jwtUtil.getSessionIdFromToken(victim.getAccessToken());
 
-        /* user_sessions carries no @TenantId, so nothing confines this query structurally — the
-           (id, userId) lookup in UserSessionService is the entire ownership check, which is why
-           it is asserted here rather than assumed. */
+        // user_sessions has no @TenantId: the (id, userId) lookup is the whole ownership check.
         mockMvc.perform(delete("/api/v1/auth/sessions/" + victimSessionId)
                         .header("Authorization", "Bearer " + attacker.getAccessToken()))
                 .andExpect(status().isNotFound());
@@ -193,8 +178,7 @@ public class SessionLifecycleIntegrationTest extends AbstractIntegrationTest {
 
         AuthResponse response = objectMapper.readValue(
                 result.getResponse().getContentAsString(), AuthResponse.class);
-        // The refresh token is stripped from the body and set as an httpOnly cookie, so the
-        // tests have to read it back the way a browser would.
+        // The refresh token comes back as an httpOnly cookie, so read it the way a browser would.
         response.setRefreshToken(refreshCookie(result));
         return response;
     }

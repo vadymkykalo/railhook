@@ -19,15 +19,6 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/**
- * Regression coverage: TestEndpointController had no tenancy check at
- * all, so any authenticated user from any organization could list, read, or
- * delete another organization's test endpoints and their captured webhook
- * traffic (headers, bodies, including Authorization/signature headers).
- *
- * Convention (matches {@link OrganizationIsolationTest} /
- * {@link AuthContextIntegrationTest}): cross-org access is denied with 403.
- */
 @AutoConfigureMockMvc
 public class TestEndpointIsolationTest extends AbstractIntegrationTest {
 
@@ -43,15 +34,12 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
     private UUID testEndpointAId;
     private String testEndpointASlug;
 
-    // Second project under org A, used for the API-key cross-project check.
     private UUID projectA2Id;
     private String apiKeyForProjectA;
 
     @BeforeEach
     void setup() throws Exception {
-        // WebhookCaptureController is backed by the Redis rate limiter, which
-        // AbstractIntegrationTest mocks out; stub it open so the capture below
-        // (used to seed real captured-request data) isn't rejected as 429.
+        // The capture endpoint's Redis limiter is mocked; stub it open or the capture answers 429.
         when(redisRateLimiterService.tryAcquireForSlug(anyString(), anyInt())).thenReturn(true);
 
         String suffix = UUID.randomUUID().toString().substring(0, 8);
@@ -62,7 +50,6 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
         projectAId = createProject(orgAJwt, "Project A");
         projectA2Id = createProject(orgAJwt, "Project A2");
 
-        // Create a test endpoint owned by org A / project A.
         MvcResult createResult = mockMvc.perform(post("/api/v1/projects/" + projectAId + "/test-endpoints")
                         .header("Authorization", "Bearer " + orgAJwt)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -73,15 +60,12 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
         testEndpointAId = UUID.fromString(created.get("id").asText());
         testEndpointASlug = created.get("slug").asText();
 
-        // Capture a real inbound request (with a sensitive header) so the isolation
-        // check on GET .../requests is exercised against real captured data.
         mockMvc.perform(post("/hook/" + testEndpointASlug)
                         .header("Authorization", "Bearer super-secret-provider-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"hello\":\"world\"}"))
                 .andExpect(status().isOk());
 
-        // API key scoped to project A only (not project A2), for the cross-project check.
         MvcResult apiKeyResult = mockMvc.perform(post("/api/v1/projects/" + projectAId + "/api-keys")
                         .header("Authorization", "Bearer " + orgAJwt)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -128,11 +112,7 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
         return UUID.fromString(json.get("id").asText());
     }
 
-    /**
-     * The body is what a test endpoint is for. The controller read it as {@code @RequestBody}, and
-     * the service then read the already-consumed request again and stored an empty string — found
-     * on production, where every captured request showed no body.
-     */
+    // The body was once read twice and stored empty.
     @Test
     public void capturedRequest_keepsTheBodyAsSent() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId + "/requests")
@@ -145,17 +125,13 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
         org.junit.jupiter.api.Assertions.assertEquals("{\"hello\":\"world\"}", first.get("body").asText());
     }
 
-    // ── org B's JWT must be denied on every one of the six handlers ──
-
     @Test
     public void orgB_create_onOrgAProject_forbidden() throws Exception {
         mockMvc.perform(post("/api/v1/projects/" + projectAId + "/test-endpoints")
                         .header("Authorization", "Bearer " + orgBJwt)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                // A resource in another organization is not found rather than forbidden: the tenant
-        // filter means this caller's queries never see it, and answering 403 would
-        // confirm the id exists.
+                // Not found rather than forbidden: 403 would confirm the id exists.
                 .andExpect(status().isNotFound());
     }
 
@@ -163,9 +139,6 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
     public void orgB_list_onOrgAProject_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints")
                         .header("Authorization", "Bearer " + orgBJwt))
-                // A resource in another organization is not found rather than forbidden: the tenant
-        // filter means this caller's queries never see it, and answering 403 would
-        // confirm the id exists.
                 .andExpect(status().isNotFound());
     }
 
@@ -173,9 +146,6 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
     public void orgB_get_onOrgAProject_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId)
                         .header("Authorization", "Bearer " + orgBJwt))
-                // A resource in another organization is not found rather than forbidden: the tenant
-        // filter means this caller's queries never see it, and answering 403 would
-        // confirm the id exists.
                 .andExpect(status().isNotFound());
     }
 
@@ -183,9 +153,6 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
     public void orgB_delete_onOrgAProject_forbidden() throws Exception {
         mockMvc.perform(delete("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId)
                         .header("Authorization", "Bearer " + orgBJwt))
-                // A resource in another organization is not found rather than forbidden: the tenant
-        // filter means this caller's queries never see it, and answering 403 would
-        // confirm the id exists.
                 .andExpect(status().isNotFound());
     }
 
@@ -193,9 +160,6 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
     public void orgB_getRequests_onOrgAProject_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId + "/requests")
                         .header("Authorization", "Bearer " + orgBJwt))
-                // A resource in another organization is not found rather than forbidden: the tenant
-        // filter means this caller's queries never see it, and answering 403 would
-        // confirm the id exists.
                 .andExpect(status().isNotFound());
     }
 
@@ -203,13 +167,8 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
     public void orgB_clearRequests_onOrgAProject_forbidden() throws Exception {
         mockMvc.perform(delete("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId + "/requests")
                         .header("Authorization", "Bearer " + orgBJwt))
-                // A resource in another organization is not found rather than forbidden: the tenant
-        // filter means this caller's queries never see it, and answering 403 would
-        // confirm the id exists.
                 .andExpect(status().isNotFound());
     }
-
-    // ── API key scoped to project A cannot reach project A2 in the same org ──
 
     @Test
     public void apiKey_crossProjectSameOrg_list_forbidden() throws Exception {
@@ -226,8 +185,6 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
                         .content("{}"))
                 .andExpect(status().isForbidden());
     }
-
-    // ── the owning org still gets 200 on all six handlers (no lockout) ──
 
     @Test
     public void orgA_list_ok() throws Exception {

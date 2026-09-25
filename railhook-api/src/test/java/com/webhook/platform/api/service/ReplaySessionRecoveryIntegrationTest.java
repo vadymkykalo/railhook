@@ -36,13 +36,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * A replay session is claimed by nothing but the thread running it. Kill that thread — a deploy,
- * an OOM — and the row said RUNNING for ever, holding one of the project's two concurrent-replay
- * slots with it. And when the replay executor was full, CallerRunsPolicy ran the whole replay on
- * the HTTP thread inside the after-commit callback, where the session's own writes join a
- * transaction that has already committed.
- */
+// A killed replay thread once left its session RUNNING forever, holding a replay slot.
 @TestPropertySource(properties = {"replay.batch-size=1", "replay.batch-delay-ms=0"})
 class ReplaySessionRecoveryIntegrationTest extends AbstractIntegrationTest {
 

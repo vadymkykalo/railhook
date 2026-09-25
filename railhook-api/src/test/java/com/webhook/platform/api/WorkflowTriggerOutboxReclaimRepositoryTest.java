@@ -27,27 +27,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * What "stalled" has to mean for a row that is allowed to wait.
- *
- * <p>The sweep measured {@code created_at} — the moment the event was ingested — and called
- * anything older than the threshold abandoned. But a row is deliberately held in PENDING whenever
- * its project is at its concurrency ceiling: {@code deferToNextPoll} puts it back on every poll,
- * which is the mechanism that stops one project taking the whole workflow pool. So a busy
- * project's rows are routinely older than the threshold *before they are claimed for the first
- * time*, and the sweep then flipped them back to PENDING while a live executor was running them.
- * The next poll re-claimed them and the workflow ran a second time, concurrently with itself,
- * burning an attempt each round until the row was marked FAILED having executed repeatedly.
- *
- * <p>The method's own javadoc says the threshold has to exceed the longest legitimate run.
- * {@code created_at} does not measure the run.
- *
- * <p>The application's own poller runs {@code claimBatch} every two seconds against the same table,
- * and when it landed between a test's insert and the test's own claim it took the row first — the
- * test's claim came back empty. Both schedules wait one interval before their first run, so
- * stretched to an hour neither runs while these tests do. (With no initial delay the first poll
- * fired as the context came up and could still land inside the first test.)
- */
+// Poll and sweep stretched to an hour so the app's own poller cannot claim a test's row first.
 @TestPropertySource(properties = {
         "workflow.trigger-outbox.poll-interval-ms=3600000",
         "workflow.trigger-outbox.stalled-sweep-ms=3600000"
@@ -74,9 +54,7 @@ class WorkflowTriggerOutboxReclaimRepositoryTest extends AbstractIntegrationTest
 
     @BeforeEach
     void seedTheEventTheRowHangsOff() {
-        // reclaimStalledRows and claimBatch act on the whole table, and the database outlives each
-        // test. A row another test left PROCESSING with an old claimed_at was reclaimed alongside
-        // this test's own, so the exact counts below passed or failed depending on test order.
+        // Both methods act on the whole table and the database outlives each test.
         new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
                 entityManager.createNativeQuery("DELETE FROM workflow_trigger_outbox").executeUpdate());
         entityManager.clear();
@@ -113,7 +91,7 @@ class WorkflowTriggerOutboxReclaimRepositoryTest extends AbstractIntegrationTest
                 .eventPayload("{}")
                 .status(WorkflowTriggerOutboxStatus.PENDING)
                 .build());
-        // created_at is insertable-only, so it is backdated through SQL rather than the entity.
+        // created_at is insertable-only, so it is backdated through SQL.
         new TransactionTemplate(transactionManager).executeWithoutResult(tx ->
                 entityManager.createNativeQuery(
                                 "UPDATE workflow_trigger_outbox SET created_at = ?1 WHERE id = ?2")

@@ -113,8 +113,6 @@ class IncomingAttemptStoreTest {
         verify(attemptRepository, never()).save(any());
     }
 
-    // ── Admissibility is decided under the Claim, not before it ──────────────────────
-
     @Test
     void aDisabledDestinationFailsTheForwardUnderItsFencingToken() {
         IncomingForwardAttempt row = pendingRow();
@@ -141,8 +139,6 @@ class IncomingAttemptStoreTest {
         assertThat(store.claim()).isInstanceOf(ClaimResult.Claimed.class);
         verify(attemptRepository, never()).save(any());
     }
-
-    // ── What the Attempt sent, not only what came back ───────────────────────────────
 
     @Test
     void theRequestHeadersAndBodyAreWrittenOntoTheAttemptRow() {
@@ -182,8 +178,6 @@ class IncomingAttemptStoreTest {
                 .doesNotContain("super-secret");
     }
 
-    // ── A Replay's Ladder is its own ─────────────────────────────────────────────────
-
     @Test
     void aReplayClaimsOnlyTheRowInItsOwnSession() {
         UUID session = UUID.randomUUID();
@@ -215,8 +209,6 @@ class IncomingAttemptStoreTest {
         assertThat(written.get(1).getReplaySessionId()).isEqualTo(session);
     }
 
-    // ── A Forward relays the bytes the provider sent ─────────────────────────────────
-
     @Test
     void anUntransformedForwardSendsTheBytesThatArrived() {
         byte[] arrived = {(byte) 0x7B, (byte) 0xC0, (byte) 0xFF, 0x00, (byte) 0x7D};
@@ -243,8 +235,7 @@ class IncomingAttemptStoreTest {
                 store.wireBody(claim(FENCE), body));
     }
 
-    // Tomcat does not decompress a request body, so a gzip body is stored and forwarded as gzip.
-    // Without the header the destination receives binary it has no way to know how to read.
+    // Tomcat does not decompress, so a gzip body is forwarded as gzip and needs its header.
     @Test
     void anUntransformedForwardCarriesTheContentEncodingItArrivedWith() {
         IncomingEvent event = event("application/json", null, new byte[] {0x1f, (byte) 0x8b, 0x08},
@@ -268,8 +259,6 @@ class IncomingAttemptStoreTest {
 
         assertThat(recorded).doesNotContain("Content-Encoding");
     }
-
-    // ── A Forward carries the provider's event metadata, never its credentials ──────
 
     // GitHub names the event only in a header: a push and an issue cannot be told apart by body.
     @Test
@@ -368,8 +357,6 @@ class IncomingAttemptStoreTest {
                 new ObjectMapper(), null, null, null, message, event, destination);
     }
 
-    // ── Fixtures ─────────────────────────────────────────────────────────────────────
-
     private IncomingAttemptStore storeFor(IncomingDestination destination, IncomingForwardMessage message) {
         IncomingEvent event = IncomingEvent.builder()
                 .id(EVENT_ID)
@@ -458,7 +445,7 @@ class IncomingAttemptStoreTest {
         return captor.getAllValues();
     }
 
-    /** Every Project active: whether a Project may still be sent for is not what this test is about. */
+    // Every Project active: project status is not what this test is about.
     private static ProjectStatusLookup activeProjects() {
         return new ProjectStatusLookup(null) {
             @Override

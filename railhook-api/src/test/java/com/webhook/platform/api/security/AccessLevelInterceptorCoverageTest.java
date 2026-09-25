@@ -19,30 +19,12 @@ import java.util.TreeSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Ratchet over the one thing that decides whether {@link RequireAccess} is enforced at all:
- * whether the request reaches {@link ScopeEnforcementInterceptor}.
- *
- * <p>{@code WebConfig} registers that interceptor with {@code addPathPatterns("/api/**")} and
- * nothing else. An annotation on a handler mapped outside that prefix is decoration — it reads
- * as a guard, {@code MutatingHandlerAccessDeclarationTest} counts it as a declaration, and no
- * check runs. Today every authenticated controller happens to live under {@code /api}; the three
- * that do not ({@code /ingress}, {@code /tunnel}, {@code /hook}) are unauthenticated by design and
- * carry no annotation. This freezes that coincidence into a rule.
- *
- * <p>{@code ScopeEnforcementInterceptorTest} proves the interceptor enforces the annotation. This
- * proves the interceptor is reached. Both are needed: the first passes just as happily when the
- * handler under test is the only one on an intercepted path.
- *
- * <p>Deliberately a plain {@code *Test}: reflection over the classpath, no Spring context and no
- * container (see {@code scripts/check-test-routing.sh}).
- */
+// WebConfig registers ScopeEnforcementInterceptor for /api/** only; @RequireAccess elsewhere is decoration.
 @Tag("ratchet")
 class AccessLevelInterceptorCoverageTest {
 
     private static final String CONTROLLER_PACKAGE = "com.webhook.platform.api.controller";
 
-    /** The single path pattern {@code WebConfig} registers the interceptor under. */
     private static final String INTERCEPTED_PREFIX = "/api/";
 
     @Test
@@ -87,11 +69,6 @@ class AccessLevelInterceptorCoverageTest {
                         + "decoration.");
     }
 
-    /**
-     * The first path a mapping declares, normalised without its trailing slash. Good enough: this
-     * test asks which prefix a handler lives under, not what its exact URI template is, and no
-     * controller here declares paths that straddle {@code /api}.
-     */
     private static String firstPathOf(RequestMapping mapping) {
         if (mapping == null) {
             return "";

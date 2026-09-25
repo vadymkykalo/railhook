@@ -20,41 +20,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.fail;
 
-/**
- * A migration that has shipped is never edited again.
- *
- * <p>Flyway records a checksum of every migration it applies and validates it on the next
- * start. The checksum covers the whole file, comments included, so changing one word of a
- * comment in a migration that has already run is enough: the application refuses to start,
- * on every deployment that has it, with a validation error naming a file nobody thinks they
- * changed. It is not repairable from the application — it needs a `flyway repair` against
- * production.
- *
- * <p>This is not hypothetical. A repository-wide rename touched a comment in
- * {@code V062__endpoint_signature_scheme.sql}; the compiler was happy, every test passed and
- * {@code make ratchets} was green, because nothing in the build had an opinion about
- * migrations changing. It was caught by reading a diff, which is not a control.
- *
- * <p><b>What this does and does not claim.</b> The hashes here are not Flyway's — Flyway's
- * are CRC32 and internal to it. Reproducing them would tie this test to a Flyway version for
- * no gain, because the question is not "what number does Flyway hold" but "did this file
- * change". What is reproduced is the one thing Flyway ignores: line endings. A file rewritten
- * CRLF is not a change to Flyway and is not a change here.
- *
- * <p><b>To regenerate</b> after adding a migration, or after a deliberate edit to one that has
- * not shipped:
- *
- * <pre>
- *   mvn test -pl railhook-api -am -Dtest=MigrationChecksumTest -Dmigrations.regenerate=true
- * </pre>
- *
- * <p>Commit the result with the migration. Two different diffs come out of that, and they read
- * very differently on review: a new migration adds a line, while an edit to an existing one
- * changes a line and adds nothing — which is the signal this exists to produce.
- *
- * <p>Deliberately a plain {@code *Test} — it reads files and needs no Docker. See
- * {@code scripts/check-test-routing.sh}.
- */
+// A shipped migration is never edited: Flyway validates its checksum, comments included.
 @Tag("ratchet")
 @DisplayName("Applied migrations are never edited")
 class MigrationChecksumTest {
@@ -108,8 +74,7 @@ class MigrationChecksumTest {
 
         StringBuilder message = new StringBuilder();
 
-        // Ordered worst first: a modified or removed migration is a production incident waiting
-        // for the next restart, while an unrecorded new one is only bookkeeping.
+        // Worst first: a modified or removed migration fails the next restart.
         if (!modified.isEmpty()) {
             message.append("\nThese migrations were modified after being committed:\n");
             modified.forEach(name -> message.append("  ").append(name).append('\n'));
@@ -159,14 +124,7 @@ class MigrationChecksumTest {
         }
     }
 
-    /**
-     * SHA-256 over the file's lines joined with {@code \n}.
-     *
-     * <p>Reading by line rather than by byte is the whole point: it makes the hash blind to
-     * line endings, which is the one difference Flyway is also blind to. Hashing the raw bytes
-     * would fire on a checkout that normalised CRLF, which is a false alarm, and a ratchet that
-     * cries wolf gets regenerated on red without being read.
-     */
+    // By line, so a CRLF rewrite is not a change here, as it is not to Flyway.
     private String hash(Path file) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

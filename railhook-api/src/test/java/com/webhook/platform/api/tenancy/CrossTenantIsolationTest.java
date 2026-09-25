@@ -21,17 +21,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Proves that the tenant filter actually confines rows.
- *
- * <p>{@code ServiceTenantParameterTest} is the ratchet that keeps {@code organizationId} out of
- * service signatures; it says nothing about whether anything is enforced. This is the other half:
- * two organizations, real rows, a real database, and the question the ADR is about — can a caller
- * scoped to one reach the other's data?
- *
- * <p>Named {@code *IsolationTest} so it routes to the Docker-backed integration job — see
- * {@code scripts/check-test-routing.sh}.
- */
 class CrossTenantIsolationTest extends AbstractIntegrationTest {
 
     @Autowired private OrganizationRepository organizationRepository;
@@ -47,8 +36,7 @@ class CrossTenantIsolationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void seedTwoOrganizations() {
-        // Organizations are not tenant-scoped -- they are the tenant -- but everything below is,
-        // so the fixture is built under the system scope.
+        // Organizations are the tenant, not tenant-scoped, so the fixture is built under the system scope.
         TenantContext.runAsSystem(() -> {
             var plan = planRepository.findAll().stream().findFirst().orElseThrow(
                     () -> new IllegalStateException("Migrations seed at least one plan"));
@@ -76,7 +64,7 @@ class CrossTenantIsolationTest extends AbstractIntegrationTest {
     @DisplayName("findById cannot reach another organization's row")
     void findByIdIsConfinedToTheTenant() {
         TenantContext.runAs(orgB, () -> {
-            // The id is correct and the row exists. It is simply not this tenant's.
+            // The id is correct and the row exists; it is simply not this tenant's.
             assertThat(projectRepository.findById(projectA)).isEmpty();
             assertThat(endpointRepository.findById(endpointA)).isEmpty();
 

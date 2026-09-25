@@ -10,15 +10,7 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Every topic the platform uses exists whenever the worker is up, whatever happened to the broker.
- *
- * <p>Topics were created once, by the kafka-init container, and nothing checked them again. On
- * production the broker's log did not live on its volume, so recreating the Kafka container threw
- * the topics away; dispatch and retry came back through auto-creation the first time something
- * wrote to them, and the two DLQ topics — written only when a message is abandoned — never did.
- * The worker declares all of them, so a missing one is created on its next start.
- */
+// Only kafka-init created topics, once; a recreated broker lost the DLQ topics for good.
 class KafkaTopicsConfigTest {
 
     @Test

@@ -13,14 +13,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * The migration that makes email addresses case-insensitive, run against a database that already
- * holds addresses, in a schema of its own so the application's schema is not touched.
- *
- * <p>Two accounts whose addresses differ only in case are two people's data, or one person's data
- * split in two, and nothing in SQL can tell which. The migration must stop and say so rather than
- * pick a winner.
- */
+// Runs in a schema of its own so the application's schema is not touched.
 class UserEmailCaseMigrationIntegrationTest extends AbstractIntegrationTest {
 
     private static final MigrationVersion BEFORE = MigrationVersion.fromVersion("75");

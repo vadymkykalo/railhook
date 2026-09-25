@@ -13,25 +13,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/**
- * Event retention deletes one row and must take a whole tree with it.
- *
- * <p>{@code DataRetentionService.cleanupOldEvents} issues a single {@code DELETE FROM events}
- * and relies on two cascades to reach everything beneath: {@code deliveries.event_id} (V001)
- * and {@code delivery_attempts.delivery_id} (V001, dropped by V052, restored by V061). If
- * either is missing the delete silently leaves orphans that nothing can reach again —
- * {@code event_id} and {@code delivery_id} are the only ways in — and the retention that is
- * supposed to bound the database bounds only its smallest table.
- *
- * <p>Asserted against real PostgreSQL rather than by reading the migrations, because the last
- * time this chain broke it broke in a migration that faithfully re-created every column and
- * every index and dropped one constraint without mentioning it.
- *
- * <p>The second half is the guard that keeps this safe to run: an event with a delivery still
- * PENDING or PROCESSING is left alone however old it is. Those rows are owned by the worker —
- * a claim may be live on one — and deleting an event out from under an in-flight attempt is a
- * far worse failure than keeping it another day.
- */
 public class EventRetentionCascadeRepositoryTest extends AbstractIntegrationTest {
 
     @PersistenceContext
@@ -53,8 +34,7 @@ public class EventRetentionCascadeRepositoryTest extends AbstractIntegrationTest
         projectId = UUID.randomUUID();
         endpointId = UUID.randomUUID();
         transactionTemplate.executeWithoutResult(tx -> {
-            // plan_id is NOT NULL and the plans are seeded by V036; any of them will do,
-            // because nothing here depends on which plan the organization is on.
+            // plan_id is NOT NULL; any seeded plan will do.
             entityManager.createNativeQuery("""
                     INSERT INTO organizations (id, name, plan_id)
                     VALUES (:id, 'retention-test', (SELECT id FROM plans ORDER BY id LIMIT 1))
@@ -85,15 +65,11 @@ public class EventRetentionCascadeRepositoryTest extends AbstractIntegrationTest
             seedAttempt(deliveryId);
         });
 
-        // The repository method itself, not a copy of its SQL: a test that restates the query
-        // proves PostgreSQL works, not that this code is right, and drifts the moment the query
-        // is edited.
+        // The repository method itself, not a copy of its SQL.
         transactionTemplate.execute(tx ->
                 eventRepository.deleteOldEvents(Instant.now().minusSeconds(90L * 86400L), 1000));
 
-        // Asserted per row rather than on the returned count: the container is shared across
-        // test classes, so how many *other* expired events one batch happened to sweep up is
-        // not this test's business.
+        // Asserted per row: the shared container may hold other classes' expired events.
         assertEquals(0L, countWhere("events", "id", eventId), "the expired event itself");
         assertEquals(0L, countWhere("deliveries", "id", deliveryId),
                 "deliveries.event_id must cascade, or a purge leaves rows nothing can reach");

@@ -16,26 +16,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Every outbound {@code WebClient} either closes the DNS-rebinding window or says why it need not.
- *
- * <p>Validating a URL and then connecting to it are two different resolutions of the same name.
- * Between them the name can move, which is what {@code SsrfProtectionCustomizer} exists to catch:
- * it re-checks the address the connector actually dials. {@code EndpointService},
- * {@code EndpointVerificationService}, {@code AlertNotificationService}, the worker's
- * {@code WebClientConfig} and {@code MtlsWebClientFactory} all apply it.
- *
- * <p>{@code HttpNodeExecutor} did not — a client a user aims by typing a URL into a workflow
- * node, whose own javadoc claimed it "reuses SSRF protection". Nothing in the build noticed,
- * because there was nothing to notice it. This is that something.
- *
- * <p>Source-level rather than reflective, for the same reason
- * {@code NativeQueryTenantPredicateTest} is: the connector is buried inside an already-built
- * client, and a runtime check would only cover whichever clients some test happens to
- * construct — the opposite of what a ratchet is for.
- *
- * <p>Deliberately a plain {@code *Test} — see {@code scripts/check-test-routing.sh}.
- */
+// Validation and connection resolve the name twice; SsrfProtectionCustomizer re-checks the dialled address.
 @Tag("ratchet")
 @DisplayName("Outbound WebClients declare their SSRF posture")
 class OutboundWebClientSsrfDeclarationTest {
@@ -44,25 +25,16 @@ class OutboundWebClientSsrfDeclarationTest {
             Paths.get("src/main/java"),
             Paths.get("../railhook-worker/src/main/java"));
 
-    /**
-     * Clients that build without the connector, and the reason each may.
-     *
-     * <p>Adding an entry asserts that the client cannot be pointed at an address the caller
-     * chooses. "The URL is validated first" is not such a reason — that is precisely the check
-     * the connector exists to backstop.
-     */
+    // "The URL is validated first" is not a reason: that is the check the connector backstops.
     private static final Set<String> NO_ATTACKER_CONTROLLED_HOST = new TreeSet<>(Set.of(
-            // Pinned to a literal host prefix before the request is built: a workflow author can
-            // only ever reach hooks.slack.com, so there is no name for a rebind to move.
+            // Pinned to hooks.slack.com: no name for a rebind to move.
             "SlackNodeExecutor",
 
             // Fixed vendor endpoints compiled into the provider, never operator- or user-supplied.
             "WayForPayBillingProvider",
             "BillingAutoConfiguration",
 
-            // Google's token and key-set endpoints: literal defaults in application.yml with no
-            // environment variable behind them, overridden only by tests. No request parameter or
-            // stored value names the host.
+            // Google's endpoints are literal defaults in application.yml, overridden only by tests.
             "GoogleSignInService"));
 
     @Test

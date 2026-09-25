@@ -21,22 +21,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The three numbers the incidents page leads with, counted over the project rather than over
- * whatever fitted on the first page.
- *
- * <p>Only one of them used to be a real count. "Open" came from this endpoint; "Investigating"
- * and "Critical" were computed in the browser from `incidents.content` — one page of a filtered,
- * paginated list, twenty rows by default. So a project with more open incidents than fit on a
- * page showed "Critical: 0" while a critical incident sat on page two, and the three tiles sat
- * side by side looking like three answers to the same question.
- *
- * <p>Which is why this test creates more incidents than one page holds: counting them right on
- * a short list is not the property that broke.
- */
 public class IncidentCountsIntegrationTest extends AbstractIntegrationTest {
 
-    /** Above the page size the UI asks for, so a page-local count cannot pass this. */
+    // Above the page size the UI asks for, so a page-local count cannot pass.
     private static final int PAGE_SIZE = 20;
 
     @Autowired
@@ -103,8 +90,7 @@ public class IncidentCountsIntegrationTest extends AbstractIntegrationTest {
     public void aProjectWithNoIncidentsCountsZeroOfEach() throws Exception {
         JsonNode counts = counts();
 
-        // Not absent, not null: the tiles render these, and a missing number reads as a
-        // broken tile rather than as a quiet project.
+        // Zero, not absent: the tiles render these.
         assertThat(counts.get("count").asLong()).isZero();
         assertThat(counts.get("investigating").asLong()).isZero();
         assertThat(counts.get("critical").asLong()).isZero();
@@ -112,12 +98,10 @@ public class IncidentCountsIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     public void everyCountSpansTheProjectAndNotOnePageOfIt() throws Exception {
-        // Fill the first page with ordinary open incidents...
         for (int i = 0; i < PAGE_SIZE + 2; i++) {
             createIncident("Routine " + i, "WARNING");
         }
-        // ...then put the interesting ones behind it. A count taken from the first page of the
-        // list sees none of these.
+        // A count taken from the first page sees none of these.
         UUID critical = createIncident("Payments endpoint is down", "CRITICAL");
         UUID beingLookedAt = createIncident("Latency spike", "WARNING");
         setStatus(beingLookedAt, "INVESTIGATING");
@@ -128,8 +112,6 @@ public class IncidentCountsIntegrationTest extends AbstractIntegrationTest {
         assertThat(counts.get("investigating").asLong()).isEqualTo(1);
         assertThat(counts.get("critical").asLong()).isEqualTo(1);
 
-        // Resolving the critical one takes it out of all three, which is the whole point of
-        // counting unresolved rather than counting rows.
         setStatus(critical, "RESOLVED");
         JsonNode after = counts();
         assertThat(after.get("critical").asLong()).isZero();
@@ -138,8 +120,6 @@ public class IncidentCountsIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     public void investigatingIsCountedAsOpenToo() throws Exception {
-        // "Open" here means not resolved. An incident somebody is actively working is the
-        // last thing that should drop out of the number a badge shows.
         UUID incident = createIncident("Under investigation", "WARNING");
         setStatus(incident, "INVESTIGATING");
 

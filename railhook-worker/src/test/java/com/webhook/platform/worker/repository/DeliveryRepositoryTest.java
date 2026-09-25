@@ -24,15 +24,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Integration test for DeliveryRepository query optimization
- * 
- * Tests:
- * 1. Query selects only PENDING deliveries with nextRetryAt <= now
- * 2. Results are ordered by nextRetryAt ASC
- * 3. Pagination works correctly (batch size limit)
- * 4. Row-level locking prevents concurrent access (PESSIMISTIC_WRITE)
- */
 @DataJpaTest
 @Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -41,13 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
 })
 class DeliveryRepositoryTest {
 
-    /**
-     * Fixture tenant for persisted rows.
-     *
-     * <p>{@code organization_id} is NOT NULL, and the worker's entities map it
-     * without filtering on it: in production the worker copies the value off the parent row it is
-     * processing. A fixture that persists directly has to supply one.
-     */
+    // organization_id is NOT NULL and the worker copies it off the parent row.
     private static final UUID FIXTURE_ORG = UUID.randomUUID();
 
     @Container
@@ -93,7 +78,6 @@ class DeliveryRepositoryTest {
 
     @Test
     void findPendingRetryIds_shouldOnlySelectPendingStatus() {
-        // Arrange
         createSharedEndpoint();
         Instant now = Instant.now();
         Delivery pending = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.minusSeconds(60));
@@ -103,19 +87,16 @@ class DeliveryRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        // Act
         List<UUID> ids = deliveryRepository.findPendingRetryIds(
                 Delivery.DeliveryStatus.PENDING, now, 10, 100, 100);
         List<Delivery> result = deliveryRepository.lockByIds(ids);
 
-        // Assert
         assertEquals(1, result.size());
         assertEquals(pending.getId(), result.get(0).getId());
     }
 
     @Test
     void findPendingRetryIds_shouldOnlySelectDueRetries() {
-        // Arrange
         createSharedEndpoint();
         Instant now = Instant.now();
         Delivery overdue = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.minusSeconds(120));
@@ -126,12 +107,10 @@ class DeliveryRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        // Act
         List<UUID> ids = deliveryRepository.findPendingRetryIds(
                 Delivery.DeliveryStatus.PENDING, now, 10, 100, 100);
         List<Delivery> result = deliveryRepository.lockByIds(ids);
 
-        // Assert
         assertEquals(2, result.size());
         assertTrue(result.stream().anyMatch(d -> d.getId().equals(overdue.getId())));
         assertTrue(result.stream().anyMatch(d -> d.getId().equals(justDue.getId())));
@@ -139,7 +118,6 @@ class DeliveryRepositoryTest {
 
     @Test
     void lockByIds_shouldOrderByNextRetryAtAsc() {
-        // Arrange
         createSharedEndpoint();
         Instant now = Instant.now();
         Delivery third = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.minusSeconds(10));
@@ -149,12 +127,10 @@ class DeliveryRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        // Act
         List<UUID> ids = deliveryRepository.findPendingRetryIds(
                 Delivery.DeliveryStatus.PENDING, now, 10, 100, 100);
         List<Delivery> result = deliveryRepository.lockByIds(ids);
 
-        // Assert
         assertEquals(3, result.size());
         assertEquals(first.getId(), result.get(0).getId());
         assertEquals(second.getId(), result.get(1).getId());
@@ -163,9 +139,7 @@ class DeliveryRepositoryTest {
 
     @Test
     void resetStrandedPendingDeliveries_shouldRecoverOldStrandedPendingRow() {
-        // Reproduces the retry-claim black hole: a PENDING delivery with next_retry_at
-        // wiped (the pre-fix claim contract nulled it without ever setting PROCESSING) is
-        // invisible to both existing recovery mechanisms.
+        // A PENDING row with next_retry_at wiped was invisible to both recovery mechanisms.
         createSharedEndpoint();
         Delivery stranded = createAndPersistDelivery(
                 Delivery.DeliveryStatus.PENDING, null, Instant.now().minus(2, java.time.temporal.ChronoUnit.HOURS));
@@ -181,17 +155,14 @@ class DeliveryRepositoryTest {
         assertEquals(0, recoveredByStuckSweep,
                 "black-holed row never reached PROCESSING, so resetStuckDeliveries can't see it either");
 
-        // Act — the belt-and-braces recovery query
         int recovered = deliveryRepository.resetStrandedPendingDeliveries(Instant.now().minusSeconds(300));
 
-        // Assert
         assertEquals(1, recovered);
         entityManager.clear();
         Delivery reloaded = deliveryRepository.findById(stranded.getId()).orElseThrow();
         assertNotNull(reloaded.getNextRetryAt());
         assertEquals(Delivery.DeliveryStatus.PENDING, reloaded.getStatus());
 
-        // And now it is visible to the normal retry poll again
         List<UUID> idsAfterRecovery = deliveryRepository.findPendingRetryIds(
                 Delivery.DeliveryStatus.PENDING, Instant.now().plusSeconds(1), 10, 100, 100);
         assertTrue(idsAfterRecovery.contains(stranded.getId()));
@@ -199,8 +170,7 @@ class DeliveryRepositoryTest {
 
     @Test
     void resetStrandedPendingDeliveries_shouldNotSweepFreshlyIngestedRow() {
-        // Freshly ingested deliveries are also PENDING with next_retry_at = NULL and rely
-        // entirely on their one outbox Kafka message — the sweep must not touch them.
+        // Freshly ingested deliveries rely on their outbox message; the sweep must not touch them.
         createSharedEndpoint();
         Delivery fresh = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, null, Instant.now());
 
@@ -216,10 +186,7 @@ class DeliveryRepositoryTest {
 
     @Test
     void claimRetryForProcessing_keepsASlowRetryOutOfTheStuckSweep() {
-        // The scheduler claimed this row six minutes ago and its message sat in the retry topic
-        // since. The consumer's CAS is the start of a real Attempt, so the stuck sweep must not
-        // treat the row as abandoned the moment the POST goes out — if it does, the scheduler
-        // re-claims it and a second request reaches the endpoint while the first is in flight.
+        // The consumer's CAS starts a real Attempt; treating the row as abandoned would send twice.
         createSharedEndpoint();
         UUID publishedToken = UUID.randomUUID();
         Instant scheduledAt = Instant.now().minus(6, java.time.temporal.ChronoUnit.MINUTES);
@@ -244,9 +211,7 @@ class DeliveryRepositoryTest {
 
     @Test
     void attemptStarting_aSweptAttemptDoesNotSpendItsSuccessorsRung() {
-        // The stuck sweep took this row from an Attempt still running, and a successor has claimed
-        // it since under a token of its own. The first Attempt only now reaches attemptStarting;
-        // matched by id alone, its increment spent a rung of the successor's Ladder.
+        // Matched by id alone, the stale Attempt's increment spent a rung of the successor's ladder.
         createSharedEndpoint();
         Delivery delivery = createAndPersistDelivery(Delivery.DeliveryStatus.PROCESSING, null);
         UUID sweptFence = UUID.randomUUID();
@@ -266,9 +231,7 @@ class DeliveryRepositoryTest {
 
     @Test
     void findStaleDeliveryIds_measuresAgeFromWhenTheDeliveryWasLastPutBackOnItsLadder() {
-        // A Delivery keeps its created_at when a person retries it from Failed Messages. Measured
-        // from created_at, one created five days ago was escalated back to DLQ at the next sweep,
-        // before its new attempts had a chance to run.
+        // A retried Delivery keeps its created_at, so age from it escalated it straight back to DLQ.
         createSharedEndpoint();
         Instant now = Instant.now();
         Delivery neverResumed = persistPendingDelivery(now.minus(100, java.time.temporal.ChronoUnit.HOURS), null);
@@ -286,12 +249,7 @@ class DeliveryRepositoryTest {
         assertTrue(stale.contains(retriedLongAgo.getId()), "a retry is not a permanent exemption from the cap");
     }
 
-    /**
-     * A failed Attempt hands the Delivery back PENDING with its next rung in next_retry_at. The
-     * dispatch claim matched on status alone, so a second copy of the dispatch message — Kafka
-     * redelivery after a rebalance, an outbox re-publish — took the row at once: an Attempt the
-     * ladder had not reached yet, spending a rung and bringing the DLQ closer.
-     */
+    // The dispatch claim once matched on status alone, so a duplicate message took a row not yet due.
     @Test
     void claimForProcessingAndReturn_leavesADeliveryWaitingOnItsLadderAlone() {
         createSharedEndpoint();
@@ -318,7 +276,6 @@ class DeliveryRepositoryTest {
 
     @Test
     void findPendingRetryIds_shouldRespectPageSize() {
-        // Arrange
         createSharedEndpoint();
         Instant now = Instant.now();
         for (int i = 0; i < 15; i++) {
@@ -328,11 +285,9 @@ class DeliveryRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        // Act
         List<UUID> ids = deliveryRepository.findPendingRetryIds(
                 Delivery.DeliveryStatus.PENDING, now, 5, 100, 100);
 
-        // Assert
         assertEquals(5, ids.size());
     }
 
@@ -353,12 +308,7 @@ class DeliveryRepositoryTest {
                 .build());
     }
 
-    /**
-     * What the ordering gate asks before it breaks the order: is anything still outstanding in
-     * the gap going to be attempted? A Delivery between the rungs of its ladder is, and its
-     * successors must keep waiting for it however long they have already waited — the gap
-     * timeout is for a gap that never closes.
-     */
+    // A Delivery between rungs will still be attempted, so its successors keep waiting.
     @Test
     void countGapClosingBefore_countsWhatIsInFlightOrDueAndNothingElse() {
         createSharedEndpoint();
@@ -386,10 +336,7 @@ class DeliveryRepositoryTest {
                         + ") and the one being attempted now (" + inFlight.getSequenceNumber() + ") count");
     }
 
-    /**
-     * The converse, and the reason the gap timeout still exists: with nothing in the gap due and
-     * nothing being attempted, waiting is futile and the successors are let through.
-     */
+    // Nothing in the gap due or being attempted: waiting is futile.
     @Test
     void countGapClosingBefore_nothingDueOrInFlight_isZero() {
         createSharedEndpoint();

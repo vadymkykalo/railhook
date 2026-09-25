@@ -43,13 +43,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * The two onboarding mails against a real schema: the welcome when an address is proven, and the
- * one nudge for an account that has sent nothing two days later.
- *
- * <p>{@link EmailService} is a mock, so what is asserted is the decision to send, per address. The
- * timestamps are asserted too: they are what makes "once" survive a restart.
- */
+// EmailService is a mock: the decision to send is asserted, and the timestamps that make it once.
 @TestPropertySource(properties = "app.onboarding-emails.enabled=true")
 class OnboardingMailIntegrationTest extends AbstractIntegrationTest {
 
@@ -68,7 +62,6 @@ class OnboardingMailIntegrationTest extends AbstractIntegrationTest {
 
     private record Account(User user, UUID organizationId) {}
 
-    /** An owner with an organization of their own, welcomed {@code welcomedAgo} ago. */
     private Account account(Duration welcomedAgo) {
         Plan plan = planRepository.findByName("self_hosted")
                 .orElseGet(() -> planRepository.findAll().stream().findFirst().orElseThrow());

@@ -32,15 +32,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The webhook tester on the public site: a URL anyone can make without an account, which keeps
- * what is sent to it for a day so a developer can see what a provider really sends.
- *
- * <p>No account means no organization, so none of this is tenant data: the slug is the only
- * identity, as it is for a test endpoint. What it must not become is an open store: it is
- * rate-limited per address, keeps a bounded number of requests of a bounded size, expires, and
- * never shows a credential it was sent.
- */
 @TestPropertySource(properties = { "public-bin.enabled=true", "public-bin.max-active=40" })
 public class PublicWebhookTesterIntegrationTest extends AbstractIntegrationTest {
 
@@ -70,12 +61,12 @@ public class PublicWebhookTesterIntegrationTest extends AbstractIntegrationTest 
         when(captchaVerifier.verify(any(), anyString())).thenReturn(true);
     }
 
-    /** Relative to the row's own created_at, so the database and the JVM need not share a zone. */
+    // Relative to the row's own created_at, so the database and the JVM need not share a zone.
     private void expire(String slug) {
         jdbcTemplate.update("UPDATE public_bins SET expires_at = created_at - INTERVAL '1 second' WHERE slug = ?", slug);
     }
 
-    /** From an address of its own, so the per-address cap is exercised only where it is meant to be. */
+    // Its own address, so the per-address cap is exercised only where it is meant to be.
     private JsonNode create() throws Exception {
         return create("198.51.100." + NEXT_ADDRESS.getAndIncrement());
     }
@@ -137,8 +128,7 @@ public class PublicWebhookTesterIntegrationTest extends AbstractIntegrationTest 
         assertThat(first.get("query").asText()).isEqualTo("attempt=1");
         assertThat(first.get("body").asText()).isEqualTo("{\"type\":\"invoice.paid\"}");
         assertThat(first.get("contentType").asText()).startsWith("application/json");
-        // Anyone with the URL can read it, so credentials and signatures are masked, as in every
-        // other capture; that the header arrived is what a developer is checking for.
+        // Anyone with the URL can read it, so credentials are masked; that the header arrived is the point.
         assertThat(first.get("headers").has("Stripe-Signature")).isTrue();
         assertThat(first.get("headers").toString()).doesNotContain("sk_live_do_not_show");
         assertThat(read(slug).get("requestCount").asLong()).isEqualTo(2);
@@ -197,7 +187,6 @@ public class PublicWebhookTesterIntegrationTest extends AbstractIntegrationTest 
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.error").value("too_many_active_urls"));
 
-        // An expired one no longer counts.
         expire(third);
         create(address);
     }
@@ -251,8 +240,7 @@ public class PublicWebhookTesterIntegrationTest extends AbstractIntegrationTest 
         mockMvc.perform(post("/hook/p/" + slug).content("x")).andExpect(status().isOk());
         expire(slug);
 
-        // The repository directly, in a transaction: the scheduled method holds a ShedLock taken
-        // when the context started, so calling it again within the minute is skipped.
+        // The scheduled method holds a ShedLock from startup, so a second call within the minute is skipped.
         new TransactionTemplate(transactionManager).executeWithoutResult(
                 status -> publicBinRepository.deleteExpired(Instant.now()));
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM public_bins WHERE slug = ?", Long.class, slug))

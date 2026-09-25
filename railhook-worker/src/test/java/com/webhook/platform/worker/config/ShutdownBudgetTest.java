@@ -15,25 +15,7 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Ratchet over the worker's shutdown budget, which is written down in three places that no
- * language links.
- *
- * <p>How long the worker needs to stop is decided in {@code application.yml}: the lifecycle
- * phase drains the Kafka containers, and then each {@code BoundedAsyncExecutor} waits out its
- * in-flight deliveries in {@code @PreDestroy} — which runs after the lifecycle phase, does not
- * share its timeout, and runs once per pool, in turn. How long it is *given* is decided by
- * Docker ({@code stop_grace_period}) and by Kubernetes
- * ({@code terminationGracePeriodSeconds}), neither of which can see the first number.
- *
- * <p>They had already drifted: the worker was given 35s against a budget of 150, so Docker sent
- * SIGKILL while the first pool was still waiting, and the Helm chart set nothing at all and got
- * the Kubernetes default of 30s on every rollout and every HPA scale-down. Both lost in-flight
- * deliveries silently — the ladder eventually re-sent them, which is exactly why nobody noticed.
- *
- * <p>The pool count is read from {@code ExecutorConfig} rather than written here, so adding a
- * third pool fails this test instead of quietly shortening the margin.
- */
+// The budget lives in application.yml, the grace periods in Compose and the chart; nothing links them.
 @Tag("ratchet")
 class ShutdownBudgetTest {
 
@@ -86,9 +68,6 @@ class ShutdownBudgetTest {
                 + "s, which does not clear its " + lifecycle + "s lifecycle phase");
     }
 
-    // ── the budget ─────────────────────────────────────────────────────────────────
-
-    /** Lifecycle phase, then one async-shutdown timeout per pool, in turn. */
     private int budgetSeconds() throws IOException {
         return lifecycleSeconds() + poolCount() * asyncShutdownSeconds();
     }
@@ -120,14 +99,7 @@ class ShutdownBudgetTest {
         return count;
     }
 
-    // ── reading ────────────────────────────────────────────────────────────────────
-
-    /**
-     * The block belonging to one service or component key — everything from that key to the
-     * next one at the same indent. A whole-file regex would match the api's value while
-     * asserting about the worker. Compose nests its services two spaces in; the chart's values
-     * are top-level, hence the indent argument.
-     */
+    // A whole-file regex would match the api's value while asserting about the worker.
     private static String section(String document, String name, int indent) {
         String pad = " ".repeat(indent);
         Matcher start = Pattern.compile("(?m)^" + pad + Pattern.quote(name) + ":\\s*$").matcher(document);
@@ -140,12 +112,10 @@ class ShutdownBudgetTest {
         return document.substring(start.end(), end);
     }
 
-    /** A Compose service. */
     private static String composeService(String document, String name) {
         return section(document, name, 2);
     }
 
-    /** A top-level key in the chart's values. */
     private static String chartComponent(String document, String name) {
         return section(document, name, 0);
     }

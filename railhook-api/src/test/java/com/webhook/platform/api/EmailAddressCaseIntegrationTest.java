@@ -20,14 +20,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * An email address names one account whatever case it is typed in.
- *
- * <p>{@code users.email} was unique only byte for byte, and registration and sign-in matched it
- * exactly, while Google sign-in and email change looked it up ignoring case and expected one row.
- * So anyone could register {@code Victim@corp.com} beside {@code victim@corp.com}: the owner's
- * Google sign-in then failed on two results, and so did any email change touching the address.
- */
 class EmailAddressCaseIntegrationTest extends AbstractIntegrationTest {
 
     private static final String PASSWORD = "Password1234!";

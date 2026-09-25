@@ -70,13 +70,6 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
         return "/api/v1/projects/" + projectId + "/events";
     }
 
-    // ── PII Masking Rules CRUD ──
-
-    /**
-     * The docs promise every project starts masking email, phone and card numbers. Projects were
-     * created with no rules at all, so customer email addresses showed in full on every event and
-     * delivery until someone found the seed button — found on production.
-     */
     @Test
     public void newProject_startsWithTheBuiltinRules() throws Exception {
         mockMvc.perform(get(piiRulesUrl())
@@ -178,8 +171,6 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
                 .andExpect(status().isUnauthorized());
     }
 
-    // ── PII Preview / Sanitization ──
-
     @Test
     public void previewSanitization_masksEmail() throws Exception {
         mockMvc.perform(post(piiRulesUrl() + "/seed-defaults")
@@ -202,8 +193,7 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
 
     @Test
     public void previewSanitization_isNeverServedAsHtml() throws Exception {
-        // CodeQL java/xss: the preview echoes the caller's payload. Negotiated as text/html (a
-        // browser's Accept header) a payload carrying markup would render as a page on our origin.
+        // CodeQL java/xss: negotiated as text/html, echoed markup would render on our origin.
         String payload = "<script>alert(1)</script>";
 
         mockMvc.perform(post(piiRulesUrl() + "/preview")
@@ -249,8 +239,6 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
         String sanitized = result.getResponse().getContentAsString();
         assert sanitized.contains("hello") : "Data should remain unchanged with no rules";
     }
-
-    // ── Sanitized Event Endpoint ──
 
     @Test
     public void getSanitizedEvent_masksPayload() throws Exception {
@@ -305,8 +293,6 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
                 .get("payload").asText();
         assert payload.contains("raw@test.com") : "Regular event endpoint should keep raw payload";
     }
-
-    // ── Event Diff ──
 
     @Test
     public void diffEvents_findsChanges() throws Exception {
@@ -436,8 +422,6 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
         assert !response.contains("new@test.com") : "Right email should be masked when sanitize=true";
     }
 
-    // ── Shared Debug Links ──
-
     @Test
     public void createDebugLink_returnsCreated() throws Exception {
         String eventId = createTestEvent();
@@ -552,8 +536,6 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
                 .andExpect(status().isUnauthorized());
     }
 
-    // ── Org Isolation ──
-
     @Test
     public void crossOrg_cannotAccessPiiRules() throws Exception {
         String otherToken = registerOtherOrg();
@@ -584,8 +566,6 @@ public class PiiMaskingAndDebugLinksIntegrationTest extends AbstractIntegrationT
                         .header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isNotFound());
     }
-
-    // ── Helpers ──
 
     private String createTestEvent() throws Exception {
         String eventBody = "{\"type\": \"test.event\", \"data\": {\"key\": \"value\"}}";

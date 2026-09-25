@@ -27,22 +27,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The operator back-office, and the suspension it exists to apply.
- *
- * <p>Two things are being pinned here, and the second is the one that was missing entirely.
- *
- * <p>Who may reach it: {@code /api/v1/admin/**} takes the platform-admin operator credential and
- * nothing else. An organization OWNER — the most privileged tenant role there is — must not be
- * able to list other people's organizations or suspend anybody, because the credential is the
- * deployment's, not a tenant's.
- *
- * <p>What suspension does: {@code BillingStatus.SUSPENDED} was written by the dunning scheduler
- * and read by nothing, so a suspended organization went on ingesting and delivering exactly as
- * before, and an operator had no way to suspend anyone except by editing the database. Writes
- * are refused with the operator's stated reason; reads keep working, so the tenant can sign in
- * and be told what happened rather than watching the dashboard fail.
- */
 @AutoConfigureMockMvc
 public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
 
@@ -83,8 +67,6 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
 
         return new Tenant(token, organizationId);
     }
-
-    // ── Who may reach the back-office ──────────────────────────────
 
     @Test
     public void anOwnerCannotListEveryOrganization() throws Exception {
@@ -129,8 +111,6 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
-    // ── What suspension does ───────────────────────────────────────
-
     @Test
     public void aSuspendedOrganizationCannotWriteAndIsToldWhy() throws Exception {
         Tenant tenant = registerTenant("suspension-blocked@example.com");
@@ -168,8 +148,7 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
                         .content("{\"reason\":\"under review\"}"))
                 .andExpect(status().isOk());
 
-        // Otherwise the tenant cannot sign in to find out what happened, and support cannot look
-        // at the same screens they can.
+        // Reads keep working so the tenant can sign in and find out why.
         mockMvc.perform(get("/api/v1/projects").header("Authorization", "Bearer " + tenant.token()))
                 .andExpect(status().isOk());
     }
@@ -198,8 +177,7 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
 
     @Test
     public void suspensionDoesNotTouchTheBillingStatus() throws Exception {
-        // The two are separate on purpose: billingStatus belongs to the payment state machine,
-        // and an abuse suspension recorded there would be lifted by the next successful charge.
+        // billingStatus belongs to payments; the next charge would lift a suspension recorded there.
         Tenant tenant = registerTenant("suspension-billing@example.com");
 
         mockMvc.perform(post("/api/v1/admin/organizations/" + tenant.organizationId() + "/suspend")
@@ -213,8 +191,6 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
                 .isTrue();
         assertThat(suspensionLookup.forOrganization(tenant.organizationId())).isPresent();
     }
-
-    // ── What suspension does to traffic nobody signs in for ────────
 
     private UUID createProject(Tenant tenant) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/projects")
@@ -254,9 +230,7 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
 
         suspend(tenant);
 
-        // 403, not the 410 a disabled Source gets: providers such as Zapier delete a subscription
-        // for good on 410, and a suspension that is lifted must find its subscriptions still there.
-        // No reason either: the sender is a third-party provider, not the customer it was written for.
+        // 403, not 410: providers such as Zapier drop a subscription for good on 410.
         mockMvc.perform(post("/ingress/" + token).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("suspended"))
@@ -307,11 +281,8 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
 
         mockMvc.perform(post("/tunnel/" + slug + "/webhooks").contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isForbidden());
-        // Refused before it reaches the developer's machine, not after.
         verify(redisTunnelCoordinator, times(1)).forwardRequest(org.mockito.ArgumentMatchers.eq(slug), any());
     }
-
-    // ── What the operator can see about one tenant ─────────────────
 
     @Test
     public void theOperatorSeesWhatATenantHasUsedAgainstTheirPlan() throws Exception {
@@ -323,12 +294,9 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
                         .content("{\"name\":\"Counted\"}"))
                 .andExpect(status().isCreated());
 
-        // "Are they near their limit" is the question behind most support tickets that reach an
-        // operator, and answering it used to mean a psql session against the tenant's rows.
         mockMvc.perform(get("/api/v1/admin/organizations/" + tenant.organizationId() + "/usage")
                         .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN))
                 .andExpect(status().isOk())
-                // The one created above; a password registration starts without one.
                 .andExpect(jsonPath("$.projects.current").value(1))
                 .andExpect(jsonPath("$.events.limit").exists())
                 .andExpect(jsonPath("$.periodStart").exists());
@@ -347,18 +315,15 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
                     .andExpect(status().isCreated());
         }
 
-        // The operator holds no organization of their own, so this only works by entering the
-        // subject's scope. Getting that wrong reads as an empty tenant rather than an error.
+        // The operator has no org of its own; a wrong scope reads as an empty tenant, not an error.
         mockMvc.perform(get("/api/v1/admin/organizations/" + busy.organizationId() + "/usage")
                         .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN))
                 .andExpect(status().isOk())
-                // The three created above.
                 .andExpect(jsonPath("$.projects.current").value(3));
 
         mockMvc.perform(get("/api/v1/admin/organizations/" + quiet.organizationId() + "/usage")
                         .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN))
                 .andExpect(status().isOk())
-                // None of the busy tenant's three.
                 .andExpect(jsonPath("$.projects.current").value(0));
     }
 

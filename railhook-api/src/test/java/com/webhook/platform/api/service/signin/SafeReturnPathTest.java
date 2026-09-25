@@ -6,11 +6,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Where the dashboard lands after signing in with Google. The value travels through Google and
- * back, so it is attacker-supplied: anything that could leave this origin is an open redirect
- * on the sign-in page, which is the most convincing place a phishing link can start.
- */
+// The value travels through Google, so it is attacker-supplied: anything off-origin is an open redirect.
 class SafeReturnPathTest {
 
     @ParameterizedTest

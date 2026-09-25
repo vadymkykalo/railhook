@@ -17,28 +17,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * WorkflowExecutionRecoveryJob doesn't literally "replay" a workflow's remaining
- * nodes — it only sweeps executions stuck in RUNNING past a threshold and marks
- * them FAILED via {@code failStuckExecutions}' bulk UPDATE (see
- * WorkflowExecutionRecoveryJob#recoverStuckExecutions). This test proves that
- * bulk UPDATE is scoped correctly at the DB layer: it only ever touches RUNNING
- * rows older than the cutoff, never a RUNNING row that's merely in-flight (not
- * stuck yet), and never a row already in a terminal status — i.e. it does not
- * "re-run" (re-touch) anything already completed.
- *
- * <p>The query is invoked directly here (wrapped in the same kind of transaction
- * the job's own {@code @Transactional} annotation provides) rather than through
- * the real {@code WorkflowExecutionRecoveryJob} bean, because that bean's method
- * is also {@code @SchedulerLock}-guarded: with {@code @EnableScheduling} active
- * in this Spring context, the job's default {@code fixedDelay} schedule fires it
- * once automatically at context startup (Spring's default {@code initialDelay=0}),
- * which grabs the ShedLock row for {@code lockAtLeastFor="30s"} — long enough to
- * silently skip any explicit call made later in the same test. The job's own
- * plumbing (cutoff computation from the configured threshold, exception
- * swallowing) is covered separately in WorkflowExecutionRecoveryJobTest with a
- * mocked repository, so nothing about the job class itself goes untested.
- */
+// Calls the query directly: the job's @SchedulerLock is taken at startup and would skip a later call.
 class WorkflowExecutionRecoveryJobIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -79,21 +58,7 @@ class WorkflowExecutionRecoveryJobIntegrationTest extends AbstractIntegrationTes
                 .build());
     }
 
-    /**
-     * Backdates started_at to {@code minutesAgo} minutes before now.
-     *
-     * <p>Hibernate stores this entity's Instant fields via its "TIMESTAMP_UTC" JDBC
-     * binding: for a Postgres {@code TIMESTAMP WITHOUT TIME ZONE} column it writes
-     * the UTC wall-clock digits of the Instant literally (no zone conversion), and
-     * later JPQL comparisons against an {@code Instant} parameter read the stored
-     * digits back the same way. A plain {@code Timestamp.from(instant)} bound via
-     * JdbcTemplate's default {@code setTimestamp} goes through the JVM's *default*
-     * time zone instead — on a non-UTC host (this container runs Europe/Kyiv,
-     * UTC+3) that silently writes different wall-clock digits than Hibernate would,
-     * so a bulk UPDATE's WHERE clause comparing against a fresh Instant.now()-based
-     * cutoff would never match rows backdated the naive way. Converting through
-     * ZoneOffset.UTC first reproduces exactly what Hibernate itself writes.
-     */
+    // Through ZoneOffset.UTC, as Hibernate writes it; a default-zone Timestamp misses on a non-UTC host.
     private void backdateStartedAt(UUID executionId, long minutesAgo) {
         Instant target = Instant.now().minus(minutesAgo, ChronoUnit.MINUTES);
         Timestamp utcWallClock = Timestamp.valueOf(java.time.LocalDateTime.ofInstant(target, java.time.ZoneOffset.UTC));
@@ -101,7 +66,6 @@ class WorkflowExecutionRecoveryJobIntegrationTest extends AbstractIntegrationTes
                 utcWallClock, executionId);
     }
 
-    /** Mirrors exactly what WorkflowExecutionRecoveryJob#recoverStuckExecutions does. */
     private int runRecoverySweep() {
         Instant cutoff = Instant.now().minus(STUCK_THRESHOLD_MINUTES, ChronoUnit.MINUTES);
         String errorMsg = "Execution timed out — recovered by cleanup job after " + STUCK_THRESHOLD_MINUTES + " minutes";
@@ -129,20 +93,16 @@ class WorkflowExecutionRecoveryJobIntegrationTest extends AbstractIntegrationTes
         int recovered = runRecoverySweep();
         assertEquals(1, recovered);
 
-        // The stuck RUNNING execution is recovered (marked FAILED)...
         WorkflowExecution reloadedStuck = executionRepository.findById(stuckRunning.getId()).orElseThrow();
         assertEquals(ExecutionStatus.FAILED, reloadedStuck.getStatus());
         assertNotNull(reloadedStuck.getErrorMessage());
         assertTrue(reloadedStuck.getErrorMessage().contains("recovered by cleanup job"));
         assertNotNull(reloadedStuck.getCompletedAt());
 
-        // ...but nothing else is touched: not the fresh RUNNING execution...
         WorkflowExecution reloadedFresh = executionRepository.findById(freshRunning.getId()).orElseThrow();
         assertEquals(ExecutionStatus.RUNNING, reloadedFresh.getStatus());
         assertNull(reloadedFresh.getCompletedAt());
 
-        // ...and not any already-terminal execution, even if it's old — this is the
-        // "does not re-run completed nodes/executions" guarantee.
         WorkflowExecution reloadedCompleted = executionRepository.findById(oldCompleted.getId()).orElseThrow();
         assertEquals(ExecutionStatus.COMPLETED, reloadedCompleted.getStatus());
         assertNull(reloadedCompleted.getErrorMessage());

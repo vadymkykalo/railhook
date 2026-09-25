@@ -123,8 +123,7 @@ class OrderingBufferServiceIntegrationTest {
         UUID endpointId = UUID.randomUUID();
         UUID second = UUID.randomUUID();
 
-        // The second Delivery parks just after the first one's release looked for ready entries,
-        // so the trigger never sees it. The scheduler re-polls it, it goes out and succeeds.
+        // Parks just after the first release looked for ready entries, so only the scheduler's re-poll sends it.
         orderingBuffer.markDelivered(endpointId, 1);
         orderingBuffer.getReadyDeliveries(endpointId);
         orderingBuffer.bufferDelivery(endpointId, second, 2);
@@ -143,8 +142,7 @@ class OrderingBufferServiceIntegrationTest {
         orderingBuffer.markDelivered(endpointId, 5);
         doThrow(redisDown()).when(redissonClient).getBucket(anyString(), any(Codec.class));
 
-        // A claimed Delivery is PROCESSING by the time the gate asks; an exception here leaves it
-        // for the stuck sweep, every sweep, until the hard cap abandons it.
+        // An exception here leaves a claimed Delivery to the stuck sweep, every sweep, until the hard cap.
         assertEquals(5L, assertDoesNotThrow(() -> orderingBuffer.getLastDeliveredSequence(endpointId)));
         assertTrue(assertDoesNotThrow(() -> orderingBuffer.canDeliver(endpointId, 6)));
     }

@@ -34,17 +34,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-/**
- * Integration test that verifies the full tunnel flow without starting
- * a real HTTP/WS server. Uses real TunnelRegistry + mock WS session
- * to simulate:
- *   1. Session creation
- *   2. WebSocket connection (authentication + registration)
- *   3. HTTP request forwarding through tunnel
- *   4. CLI response back through WebSocket
- *   5. Response returned to the ingress caller
- *   6. Session cleanup on disconnect
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @Timeout(value = 15, unit = TimeUnit.SECONDS)
@@ -56,7 +45,6 @@ class TunnelFlowIntegrationTest {
     private TunnelWebSocketHandler webSocketHandler;
     private RedisTunnelCoordinator redisTunnelCoordinator;
 
-    // Mocks
     private com.webhook.platform.api.domain.repository.TunnelSessionRepository tunnelSessionRepository;
     private com.webhook.platform.api.domain.repository.ProjectRepository projectRepository;
 
@@ -82,7 +70,6 @@ class TunnelFlowIntegrationTest {
         tunnelRegistry = new TunnelRegistry(objectMapper, meterRegistry);
         webSocketHandler = new TunnelWebSocketHandler(tunnelService, tunnelRegistry, redisTunnelCoordinator, objectMapper, meterRegistry);
 
-        // Pre-create a tunnel session
         tunnelToken = "test-tunnel-token-" + UUID.randomUUID();
         publicSlug = "tun-inttest12345";
 
@@ -101,7 +88,6 @@ class TunnelFlowIntegrationTest {
 
     @Test
     void fullTunnelFlow_createSession_connectWs_forwardRequest_receiveResponse() throws Exception {
-        // ── Step 1: Simulate WS connection with valid token ──
         when(tunnelSessionRepository.findByTunnelToken(tunnelToken))
                 .thenReturn(java.util.Optional.of(testSession));
         when(tunnelSessionRepository.save(any(TunnelSession.class)))
@@ -110,15 +96,12 @@ class TunnelFlowIntegrationTest {
         WebSocketSession wsSession = createMockWsSession(tunnelToken);
         webSocketHandler.afterConnectionEstablished(wsSession);
 
-        // Verify tunnel is registered
         assertTrue(tunnelRegistry.isActive(publicSlug),
                 "Tunnel should be registered and active after WS connect");
         assertEquals(1, tunnelRegistry.activeCount());
 
-        // Verify TUNNEL_REGISTERED message was sent to CLI
         verify(wsSession, atLeastOnce()).sendMessage(any(TextMessage.class));
 
-        // ── Step 2: Forward an HTTP request through the tunnel ──
         TunnelRequestMessage incomingRequest = TunnelRequestMessage.builder()
                 .type("TUNNEL_REQUEST")
                 .requestId("req-" + UUID.randomUUID())
@@ -130,7 +113,6 @@ class TunnelFlowIntegrationTest {
                 .timestampMs(System.currentTimeMillis())
                 .build();
 
-        // Capture the WS message sent to the "CLI"
         CapturedMessage capturedRequest = new CapturedMessage();
         doAnswer(inv -> {
             TextMessage msg = inv.getArgument(0);
@@ -139,15 +121,13 @@ class TunnelFlowIntegrationTest {
             return null;
         }).when(wsSession).sendMessage(any(TextMessage.class));
 
-        // Forward runs on a separate thread because it blocks waiting for response
+        // Forward blocks waiting for the response, so run it on another thread.
         CompletableFuture<TunnelResponseMessage> responseFuture = CompletableFuture.supplyAsync(() ->
                 tunnelRegistry.forwardRequest(publicSlug, incomingRequest));
 
-        // Wait for the request to be sent to the WS session
         assertTrue(capturedRequest.latch.await(5, TimeUnit.SECONDS),
                 "Request should be forwarded to WS session");
 
-        // Verify the captured message is a valid TUNNEL_REQUEST envelope
         TunnelMessage sentEnvelope = objectMapper.readValue(capturedRequest.payload, TunnelMessage.class);
         assertEquals(TunnelMessage.TYPE_TUNNEL_REQUEST, sentEnvelope.getType());
         assertNotNull(sentEnvelope.getRequest());
@@ -157,7 +137,6 @@ class TunnelFlowIntegrationTest {
         assertEquals("foo=bar", sentEnvelope.getRequest().getQueryString());
         assertEquals("{\"hello\":\"world\"}", sentEnvelope.getRequest().getBody());
 
-        // ── Step 3: Simulate CLI sending back the response ──
         TunnelResponseMessage cliResponse = TunnelResponseMessage.builder()
                 .type("TUNNEL_RESPONSE")
                 .requestId(incomingRequest.getRequestId())
@@ -171,10 +150,8 @@ class TunnelFlowIntegrationTest {
         TunnelMessage responseEnvelope = TunnelMessage.tunnelResponse(cliResponse);
         String responseJson = objectMapper.writeValueAsString(responseEnvelope);
 
-        // Handle the response message through the WS handler
         webSocketHandler.handleMessage(wsSession, new TextMessage(responseJson));
 
-        // ── Step 4: Verify the response is returned to the ingress caller ──
         TunnelResponseMessage result = responseFuture.get(5, TimeUnit.SECONDS);
         assertNotNull(result, "Should receive response from CLI");
         assertEquals(200, result.getStatusCode());
@@ -183,7 +160,6 @@ class TunnelFlowIntegrationTest {
         assertEquals(42, result.getDurationMs());
         assertEquals("application/json", result.getHeaders().get("Content-Type"));
 
-        // No pending requests after completion
         assertEquals(0, tunnelRegistry.pendingRequestCount());
     }
 
@@ -197,16 +173,13 @@ class TunnelFlowIntegrationTest {
         WebSocketSession wsSession = createMockWsSession(tunnelToken);
         webSocketHandler.afterConnectionEstablished(wsSession);
 
-        // Clear invocations from connection establishment
         clearInvocations(wsSession);
         when(wsSession.isOpen()).thenReturn(true);
 
-        // Send heartbeat from CLI
         TunnelMessage heartbeat = TunnelMessage.heartbeat();
         String heartbeatJson = objectMapper.writeValueAsString(heartbeat);
         webSocketHandler.handleMessage(wsSession, new TextMessage(heartbeatJson));
 
-        // Verify server sent heartbeat back
         verify(wsSession).sendMessage(argThat(msg -> {
             try {
                 TunnelMessage resp = objectMapper.readValue(((TextMessage) msg).getPayload(), TunnelMessage.class);
@@ -216,7 +189,6 @@ class TunnelFlowIntegrationTest {
             }
         }));
 
-        // Verify DB heartbeat was updated
         verify(tunnelSessionRepository, atLeast(2)).findByTunnelToken(tunnelToken);
     }
 
@@ -232,16 +204,12 @@ class TunnelFlowIntegrationTest {
 
         assertTrue(tunnelRegistry.isActive(publicSlug));
 
-        // Simulate WS disconnect
         webSocketHandler.afterConnectionClosed(wsSession, CloseStatus.NORMAL);
 
-        // Tunnel should be unregistered
         assertFalse(tunnelRegistry.isActive(publicSlug));
         assertEquals(0, tunnelRegistry.activeCount());
 
-        // A dropped socket is not a closed tunnel: the CLI closes it explicitly (DELETE /tunnels/{id})
-        // and a session nobody reconnects to expires by heartbeat. Closing it here made every API
-        // restart — each rolling deploy — end every developer's tunnel for good.
+        // A dropped socket is not a closed tunnel: closing it ended every tunnel on each rolling deploy.
         verify(tunnelSessionRepository, never()).save(argThat(s -> s.getStatus() == TunnelStatus.CLOSED));
         assertEquals(TunnelStatus.ACTIVE, testSession.getStatus());
     }
@@ -271,17 +239,14 @@ class TunnelFlowIntegrationTest {
                 .thenReturn(java.util.Optional.empty());
 
         WebSocketSession wsSession = createMockWsSession("invalid-token");
-        // getByToken throws ResponseStatusException for missing token
         when(tunnelSessionRepository.findByTunnelToken("invalid-token"))
                 .thenReturn(java.util.Optional.empty());
 
         webSocketHandler.afterConnectionEstablished(wsSession);
 
-        // WS should be closed with policy violation
         verify(wsSession).close(argThat(status ->
                 status.getCode() == CloseStatus.POLICY_VIOLATION.getCode()));
 
-        // Tunnel should NOT be registered
         assertEquals(0, tunnelRegistry.activeCount());
     }
 
@@ -335,9 +300,7 @@ class TunnelFlowIntegrationTest {
                 .path("/slow")
                 .build();
 
-        // Use a shorter timeout by sending to a slug with an open session but never completing
-        // The default 30s timeout would make the test slow; we test the null-return path instead
-        // by forwarding to a non-existent slug
+        // The default 30s timeout would be slow; the null-return path covers it.
         TunnelResponseMessage result = tunnelRegistry.forwardRequest("nonexistent-slug", request);
         assertNull(result, "Should return null for non-connected tunnel");
         assertEquals(0, tunnelRegistry.pendingRequestCount());
@@ -353,7 +316,6 @@ class TunnelFlowIntegrationTest {
         WebSocketSession wsSession = createMockWsSession(tunnelToken);
         webSocketHandler.afterConnectionEstablished(wsSession);
 
-        // Capture all sent messages
         ConcurrentLinkedQueue<String> sentMessages = new ConcurrentLinkedQueue<>();
         doAnswer(inv -> {
             TextMessage msg = inv.getArgument(0);
@@ -366,7 +328,6 @@ class TunnelFlowIntegrationTest {
         CountDownLatch allStarted = new CountDownLatch(requestCount);
         ConcurrentHashMap<String, CompletableFuture<TunnelResponseMessage>> futures = new ConcurrentHashMap<>();
 
-        // Fire N concurrent requests
         for (int i = 0; i < requestCount; i++) {
             String reqId = "req-concurrent-" + i;
             TunnelRequestMessage req = TunnelRequestMessage.builder()
@@ -383,10 +344,9 @@ class TunnelFlowIntegrationTest {
         }
 
         allStarted.await(5, TimeUnit.SECONDS);
-        // Give time for all requests to be pending
         Thread.sleep(200);
 
-        // Simulate CLI responding to all requests (in reverse order to test correlation)
+        // Reverse order to test correlation.
         for (int i = requestCount - 1; i >= 0; i--) {
             String reqId = "req-concurrent-" + i;
             TunnelResponseMessage response = TunnelResponseMessage.builder()
@@ -397,7 +357,6 @@ class TunnelFlowIntegrationTest {
             tunnelRegistry.completeRequest(wsSession.getId(), reqId, response);
         }
 
-        // Verify all responses are correctly correlated
         for (int i = 0; i < requestCount; i++) {
             String reqId = "req-concurrent-" + i;
             TunnelResponseMessage result = futures.get(reqId).get(5, TimeUnit.SECONDS);
@@ -421,7 +380,6 @@ class TunnelFlowIntegrationTest {
         WebSocketSession wsSession = createMockWsSession(tunnelToken);
         webSocketHandler.afterConnectionEstablished(wsSession);
 
-        // Should not throw
         assertDoesNotThrow(() ->
                 webSocketHandler.handleTransportError(wsSession, new IOException("Connection reset")));
     }
@@ -436,15 +394,11 @@ class TunnelFlowIntegrationTest {
         WebSocketSession wsSession = createMockWsSession(tunnelToken);
         webSocketHandler.afterConnectionEstablished(wsSession);
 
-        // Send invalid JSON — should be handled gracefully
         assertDoesNotThrow(() ->
                 webSocketHandler.handleMessage(wsSession, new TextMessage("{invalid json!!!")));
 
-        // Tunnel should still be active
         assertTrue(tunnelRegistry.isActive(publicSlug));
     }
-
-    // ── Helpers ──────────────────────────────────────────────────────
 
     private WebSocketSession createMockWsSession(String token) throws Exception {
         WebSocketSession session = mock(WebSocketSession.class);

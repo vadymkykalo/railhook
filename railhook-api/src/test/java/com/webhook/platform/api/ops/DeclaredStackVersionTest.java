@@ -15,15 +15,7 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Ratchet over the framework version, which the build sets and CLAUDE.md repeats.
- *
- * <p>CLAUDE.md's first line said Spring Boot 3.5 well after the upgrade to 4.1. Nothing connected
- * it to the pom, so nothing could have caught it; the version was typed twice and changed once.
- *
- * <p>Major and minor only. The patch moves with every dependency bump and the document is not
- * making a claim that fine.
- */
+// CLAUDE.md said Boot 3.5 long after 4.1; major and minor only.
 @Tag("ratchet")
 class DeclaredStackVersionTest {
 

@@ -9,20 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * The plan ladder as the migrations leave it, asserted against the numbers the
- * public landing page prints.
- *
- * `railhook-ui/src/pages/landing/plans.ts` hand-mirrors the free plan's limits,
- * which the landing quotes for Railhook Cloud — it cannot query the database, and quoting a limit
- * it does not enforce is the kind of mistake nobody notices until a customer
- * does. Nothing but a test spans the two, so this is it: change a seeded limit
- * and this fails, naming the file to update.
- *
- * Needs Docker: Flyway runs against the Testcontainers database, which is the
- * whole point — these are the values a real deployment ends up with, not a
- * fixture.
- */
+// railhook-ui's plans.ts hand-mirrors the free plan's limits; update it with a seeded limit.
 class SeededPlanIntegrationTest extends AbstractIntegrationTest {
 
     private static final int UNLIMITED = -1;
@@ -39,9 +26,7 @@ class SeededPlanIntegrationTest extends AbstractIntegrationTest {
     void freePlanGrantsOneTunnel() {
         Plan free = plan("free");
 
-        /* Both halves matter. EntitlementService.checkTunnelLimit() rejects on
-           the feature flag before it ever reads the count, so a plan with a
-           limit of 1 and the flag off still grants nothing. */
+        // checkTunnelLimit rejects on the feature flag before reading the count.
         assertThat(free.getMaxActiveTunnels()).isEqualTo(1);
         assertThat(free.hasFeature("tunnels")).isTrue();
     }
@@ -90,9 +75,7 @@ class SeededPlanIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("free carries every feature: there is no paid plan to upgrade to, so quotas are its only limit")
     void freePlanCarriesEveryFeature() {
-        // Production showed "Feature 'workflows' is not available on your current plan. Please
-        // upgrade" to a cloud user who could not buy anything — a dead end. Until paid plans are
-        // sold, free is bounded by its quotas (events, projects, retention), not by features.
+        // Until paid plans are sold, free is bounded by quotas, not features.
         Plan free = plan("free");
         for (String feature : new String[] { "workflows", "rules", "replay", "mTLS", "tunnels" }) {
             assertThat(free.hasFeature(feature)).as(feature).isTrue();
@@ -104,16 +87,11 @@ class SeededPlanIntegrationTest extends AbstractIntegrationTest {
     void featureLadderMatchesThePricingTable() {
         assertThat(plan("starter").hasFeature("workflows")).isTrue();
 
-        /* The seed and every @RequireFeature spell it "mTLS", not "mtls". A
-           lookup with the wrong casing silently returns false, which would gate
-           a Pro customer out of a feature they are paying for. */
+        // Spelled "mTLS"; a lookup with the wrong casing silently returns false.
         assertThat(plan("starter").hasFeature("mTLS")).isFalse();
         assertThat(plan("pro").hasFeature("mTLS")).isTrue();
 
-        /* V036 seeded "sso": true on enterprise and self_hosted with no SSO
-           anywhere in the tree, and the Billing page renders whatever `features`
-           holds — so a paying customer was shown SSO as included. V059 drops the
-           key; this keeps it dropped until an implementation seeds it back. */
+        // V059 dropped the "sso" key seeded with no SSO implementation; keep it dropped.
         for (String name : new String[] { "free", "starter", "pro", "enterprise", "self_hosted" }) {
             assertThat(plan(name).getFeatures().has("sso"))
                     .as("%s must not advertise SSO: no implementation exists", name)

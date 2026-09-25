@@ -16,11 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/**
- * A Source's rate limit is the admission limit on its public ingress URL. It had no bounds at
- * all, so any organization could set 1,000,000 per second and step past its plan's
- * {@code rate_limit_per_second}.
- */
+// Unbounded, a Source's limit let any organization step past its plan's rate_limit_per_second.
 class IncomingSourceRequestValidationTest {
 
     private final EntitlementService entitlementService = mock(EntitlementService.class);

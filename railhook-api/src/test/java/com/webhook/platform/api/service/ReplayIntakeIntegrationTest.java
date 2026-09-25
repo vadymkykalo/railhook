@@ -42,13 +42,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
-/**
- * A replayed Event reaches exactly the endpoints, with exactly the transformation, that a fresh
- * ingest of it would. Replay used to carry its own copy of the matching: an event-type filter
- * loaded only subscriptions of that exact type, so {@code payment.*} was silently skipped, and
- * the project's rules were never consulted — a DROP was replayed anyway, a ROUTE was not, a
- * TRANSFORM meant to strip data was bypassed, and no fan-out cap applied.
- */
+// Replay once carried its own matching and skipped patterns and rules.
 @TestPropertySource(properties = {
         "replay.batch-delay-ms=0",
         // Small enough that three subscriptions exceed it and two do not.
@@ -152,8 +146,6 @@ class ReplayIntakeIntegrationTest extends AbstractIntegrationTest {
         assertThat(finished.getStatus()).isEqualTo(ReplaySessionStatus.COMPLETED);
         assertThat(finished.getErrors()).isEqualTo(1);
     }
-
-    // ─── fixtures ────────────────────────────────────────────────────────
 
     private UUID endpoint() {
         return endpointRepository.save(Endpoint.builder()

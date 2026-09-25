@@ -18,33 +18,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Exercises PartitionMaintenanceService against a real Postgres (Testcontainers),
- * which is also where the V052/V053 partitioning migrations get their only real
- * verification in this repo's test suite: AbstractIntegrationTest boots a full Spring
- * context, which runs Flyway, which applies V052/V053 — so a broken partitioning
- * migration fails every integration test class, not just this one. These tests then
- * check the actual partition-drop / partition-create behavior PartitionMaintenanceService
- * is responsible for.
- * <p>
- * All methods here share one Testcontainers Postgres database
- * (@DirtiesContext(AFTER_CLASS) on AbstractIntegrationTest), so this class is ordered
- * explicitly: {@link #dropExpiredPartitionsRemovesOnlyPartitionsFullyPastRetention()}
- * drops the real, migration-created legacy partition to prove the mechanism end to end
- * (proving a retention run actually drops a partition end to end), and every other test that assumes that partition still
- * exists is ordered before it.
- */
+// Ordered: the last test drops the migration-created legacy partition the others rely on.
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class PartitionMaintenanceServiceIntegrationTest extends AbstractIntegrationTest {
 
-    /**
-     * Fixture tenant for rows inserted straight through JDBC.
-     *
-     * <p>These fixtures bypass the entity mapping (and the FK checks, via
-     * {@code session_replication_role = replica}) that would normally stamp
-     * {@code organization_id}, so they name one themselves. The value only has to be non-null and
-     * consistent — nothing here asserts on tenant confinement.
-     */
+    // JDBC fixtures bypass the entity mapping, so they stamp organization_id themselves.
     private static final UUID FIXTURE_ORG = UUID.randomUUID();
 
     @Autowired
@@ -81,11 +59,10 @@ class PartitionMaintenanceServiceIntegrationTest extends AbstractIntegrationTest
     void rowsRouteToTheirCorrectPartitionByCreatedAt() {
         UUID deliveryId = createDelivery();
 
-        // Well before the current month's cutover -> lands in the legacy partition.
+        // Lands in the legacy partition.
         insertDeliveryAttempt(deliveryId, 1, Instant.now().minus(400, ChronoUnit.DAYS));
-        // Now -> lands in the current-month partition.
         insertDeliveryAttempt(deliveryId, 2, Instant.now());
-        // Far beyond the lookahead window seeded by the migration -> DEFAULT partition.
+        // Beyond the migration's lookahead: the DEFAULT partition.
         insertDeliveryAttempt(deliveryId, 3, Instant.now().plus(1000, ChronoUnit.DAYS));
 
         Long legacyCount = jdbcTemplate.queryForObject(
@@ -108,8 +85,6 @@ class PartitionMaintenanceServiceIntegrationTest extends AbstractIntegrationTest
         long datedPartitions = afterFirstRun.stream().filter(p -> p.matches("delivery_attempts_y\\d{4}_m\\d{2}")).count();
         assertTrue(datedPartitions >= 7, "current month + 6 lookahead months should all exist");
 
-        // Re-running with the same (or a smaller) lookahead must not error — CREATE TABLE
-        // IF NOT EXISTS makes this idempotent.
         partitionMaintenanceService.ensureFutureMonthlyPartitions("delivery_attempts", 6);
         List<String> afterSecondRun = childPartitionNames("delivery_attempts");
         assertEquals(afterFirstRun.size(), afterSecondRun.size(), "re-running maintenance must not create duplicates");
@@ -118,15 +93,11 @@ class PartitionMaintenanceServiceIntegrationTest extends AbstractIntegrationTest
     @Test
     @Order(5)
     void dropExpiredPartitionsRemovesOnlyPartitionsFullyPastRetention() {
-        // Ordered last (@Order(5)): this drops the real, migration-created legacy
-        // partition, which every earlier test in this class relies on still existing.
         UUID deliveryId = createDelivery();
-        insertDeliveryAttempt(deliveryId, 1, Instant.now().minus(400, ChronoUnit.DAYS)); // -> legacy
-        insertDeliveryAttempt(deliveryId, 2, Instant.now());                              // -> current month
+        insertDeliveryAttempt(deliveryId, 1, Instant.now().minus(400, ChronoUnit.DAYS));
+        insertDeliveryAttempt(deliveryId, 2, Instant.now());
 
-        // retentionDays = 0: the legacy partition's upper bound (start of this month) is
-        // already in the past, so it's fully expired. The current-month partition's upper
-        // bound is next month, still in the future, so it must survive.
+        // retentionDays = 0: the legacy partition is fully expired, the current month's is not.
         int dropped = partitionMaintenanceService.dropExpiredPartitions("delivery_attempts", 0);
         assertTrue(dropped >= 1, "expected at least the legacy partition to be dropped");
 

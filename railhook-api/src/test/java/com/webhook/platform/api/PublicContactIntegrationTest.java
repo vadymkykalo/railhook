@@ -20,14 +20,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The message form on the public site: a visitor with no account writes to support, and the mail
- * arrives with their address as Reply-To so the answer is one click.
- *
- * <p>Anonymous and it sends mail, so it must not become a relay: it only ever writes to the
- * deployment's own support address, never to the address the visitor typed, and it sits behind
- * the same challenge and a per-address limit as the tester.
- */
 public class PublicContactIntegrationTest extends AbstractIntegrationTest {
 
     private static final String VALID = """

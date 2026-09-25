@@ -25,31 +25,7 @@ import java.util.TreeMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Guards the stability of the operationIds in the published OpenAPI spec.
- *
- * <p>Springdoc names an operation after its Java method and, when two methods
- * across different controllers share a name, disambiguates them with a
- * positional {@code _1}, {@code _2}, ... suffix assigned in iteration order.
- * That order is not stable, so the same unchanged codebase emitted
- * {@code get_2} on one run and {@code get_4} on the next. Those ids are the
- * method names generated SDKs expose, and the committed {@code openapi.yaml} is
- * drift-checked in CI — an unstable id is a churning public API and a recurring
- * false-red build at the same time.
- *
- * <p>{@code OperationIdNamingConfig} replaces that behaviour with a
- * deterministic one, but it can only qualify a duplicate by its HTTP method —
- * which genuinely separates one handler mapped to several verbs, and does
- * nothing for two different controllers that both expose a {@code GET} named
- * {@code get}. Those have to be resolved at the source with an explicit
- * {@code @Operation(operationId = ...)}, and this test is what makes that
- * mandatory: it models how the effective id is derived and fails on any
- * collision the naming config cannot resolve on its own, so a new controller
- * method is caught here rather than surfacing later as spec churn.
- *
- * <p>A plain unit test on purpose: it scans bytecode, needs no Spring context or
- * database, and so belongs to the fast CI job.
- */
+// Springdoc's positional _1/_2 suffixes are unstable; colliding ids need an explicit operationId.
 @Tag("ratchet")
 class OpenApiOperationIdTest {
 
@@ -123,13 +99,6 @@ class OpenApiOperationIdTest {
                 .isEmpty();
     }
 
-    /**
-     * Mirrors the id derivation: the explicit annotation value when set, otherwise the
-     * method name — and, for a handler mapped to several verbs (which becomes one
-     * operation per verb), the HTTP-method suffix
-     * {@code OperationIdNamingConfig#deterministicOperationIds} appends to
-     * separate them.
-     */
     private static List<String> effectiveOperationIds(Method method, RequestMapping mapping) {
         Operation operation = AnnotatedElementUtils.findMergedAnnotation(method, Operation.class);
         String base = operation != null && !operation.operationId().isBlank()

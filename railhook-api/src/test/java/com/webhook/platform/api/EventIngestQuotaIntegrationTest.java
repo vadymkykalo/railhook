@@ -28,13 +28,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * POST /api/v1/events against a month's quota that the last accepted Event used up.
- *
- * <p>The quota was checked by an aspect on the controller, before the service looked the
- * Idempotency-Key up — so a client that lost the answer to the Event which took the last slot and
- * retried it, as the key exists for, was told it was over quota for an Event already accepted.
- */
+// The quota check once ran before the Idempotency-Key lookup and refused retries of accepted events.
 @TestPropertySource(properties = "billing.enabled=true")
 class EventIngestQuotaIntegrationTest extends AbstractIntegrationTest {
 

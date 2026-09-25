@@ -17,11 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * The endpoint's {@code rateLimitPerSecond} and the per-project delivery cap are read on every
- * attempt, and Redis must follow them: a Redisson rate written only when the key is absent stays
- * whatever it first was for as long as traffic keeps the key alive.
- */
+// A Redisson rate written only when the key is absent stays whatever it first was.
 @Testcontainers
 class DeliveryRateLimitersIntegrationTest {
 

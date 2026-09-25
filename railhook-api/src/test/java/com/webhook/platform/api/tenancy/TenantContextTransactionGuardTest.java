@@ -11,19 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Guard over the most-repeated tenancy footgun: entering a tenant scope after the
- * transaction has already opened.
- *
- * <p>Hibernate reads the tenant when it opens the session, so a scope entered inside an active
- * transaction arrives too late — the row is stamped with whatever scope was in effect when the
- * transaction began. The declarative path is already safe by construction
- * ({@link SystemTenantAspect} runs at {@code HIGHEST_PRECEDENCE}, outside {@code @Transactional});
- * the imperative path had nothing but a comment, and the failure is silent.
- *
- * <p>Deliberately a plain {@code *Test}: pure {@code ThreadLocal} manipulation, no Spring context
- * and no container, so it belongs in the no-Docker unit job.
- */
+// Hibernate reads the tenant when the session opens, so a scope entered inside a transaction is too late.
 class TenantContextTransactionGuardTest {
 
     private static final UUID ORG = UUID.fromString("11111111-1111-1111-1111-111111111111");

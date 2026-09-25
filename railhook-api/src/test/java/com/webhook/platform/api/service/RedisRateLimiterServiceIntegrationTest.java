@@ -17,11 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * A plan upgrade or downgrade, a source's changed rate limit: each arrives as a different
- * {@code ratePerSecond} for a limiter whose key is still alive, and Redis has to follow it. A
- * Redisson rate written only when the key is absent kept whatever was written first.
- */
+// A Redisson rate written only when the key is absent kept whatever was written first.
 @Testcontainers
 class RedisRateLimiterServiceIntegrationTest {
 

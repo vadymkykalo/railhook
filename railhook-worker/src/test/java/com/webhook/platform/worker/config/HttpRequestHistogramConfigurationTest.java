@@ -13,15 +13,7 @@ import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Ratchet over the latency buckets both services publish for their HTTP requests.
- *
- * <p>Spring exports {@code http_server_requests_seconds} as a count and a sum only. Without
- * buckets {@code histogram_quantile} has nothing to read, and every latency percentile panel —
- * the overview's p95 and the JVM dashboard's p50 to p99 — showed "No data". Service-level
- * boundaries rather than {@code percentiles-histogram}: a fixed handful of buckets per URI and
- * status instead of seventy.
- */
+// Without buckets histogram_quantile has nothing to read and every percentile panel says No data.
 @Tag("ratchet")
 class HttpRequestHistogramConfigurationTest {
 

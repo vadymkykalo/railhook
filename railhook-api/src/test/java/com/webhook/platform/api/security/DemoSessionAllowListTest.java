@@ -19,39 +19,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Ratchet over the handlers a public demo session may change something through.
- *
- * <p>A demo token goes to anyone who asks for one, and {@link AllowedInDemo} is the only way past
- * the rule that it changes nothing. So the set is frozen here: adding a handler to it is a
- * security decision made in review, with the reason written on the annotation, never a way to get
- * a test green. {@code DemoSessionIntegrationTest} proves every other state-changing handler
- * refuses a real demo session.
- *
- * <p>Deliberately a plain {@code *Test}: reflection over the classpath, no container.
- */
+// Adding a handler here is a security decision made in review, never a way to get green.
 @Tag("ratchet")
 class DemoSessionAllowListTest {
 
     private static final String CONTROLLER_PACKAGE = "com.webhook.platform.api.controller";
 
     private static final Set<String> ALLOWED = Set.of(
-            // Ends the caller's own demo session; the demo branch leaves the browser's cookie alone.
+            // Ends the caller's own demo session.
             "AuthController.logout",
-            // Opens a new demo session, so an expired one can be replaced.
+            // Replaces an expired demo session.
             "PublicDemoController.createSession",
-            // The public site's anonymous forms, usable by a visitor who still holds a demo token.
+            // The public site's anonymous forms.
             "PublicContactController.send",
             "PublicBinController.create",
-            // The Transform Studio's Run button. A POST because a script and its input do not fit
-            // in a query string, not because anything is stored: it runs the script in the
-            // sandbox and returns what came out. Nothing of the demo's changes, and a Studio a
-            // visitor cannot run is a screenshot.
+            // Runs the script in the sandbox; nothing is stored.
             "TransformPreviewController.preview",
-            // The same Run button with an Endpoint named, so the visitor sees the body, the URL
-            // and the headers a real Delivery would carry. It declares WRITE because it normally
-            // returns a working X-Signature — the demo's copy does not, DemoDryRunMask replaces
-            // it, which is the whole reason this handler can be on this list at all.
+            // Declares WRITE, but DemoDryRunMask removes the signature for the demo.
             "TransformPreviewController.deliveryDryRun");
 
     @Test
@@ -70,14 +54,7 @@ class DemoSessionAllowListTest {
                         + "Adding one is a review decision: update this list with the reason, or remove the annotation.");
     }
 
-    /**
-     * The Transform Studio is the one screen whose value is a button that executes something, so
-     * it is the one place the demo runs code. These two cases name the handlers rather than
-     * leaving them to the set above, because what must stay true is asymmetric: running a script
-     * is allowed, and saving one — or creating, editing or deleting the Transformation it would
-     * be saved into — is not. A refactor that moved the annotation one method down would keep
-     * {@link #allowListIsFrozen} green and hand a stranger the transformation store.
-     */
+    // Named rather than left to the set: moving the annotation one method down would expose the store.
     @Test
     @DisplayName("the demo may run a transformation, in both places the product runs one")
     void theDemoMayRunATransformation() {

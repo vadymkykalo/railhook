@@ -14,11 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
-/**
- * Every public endpoint that hands a body on as sent — ingress to its Destinations, a tunnel to
- * the developer's machine, a test capture to the person reading it — needs the bytes kept before
- * anything parses the form out of the stream. Only {@code /ingress/} had them.
- */
+// Tunnel and test-capture bodies need the raw bytes too; only /ingress/ kept them.
 class IngressRawBodyFilterTest {
 
     private static final byte[] FORM = "text=a%20b&token=X%2fY".getBytes(StandardCharsets.US_ASCII);

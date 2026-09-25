@@ -21,21 +21,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * {@link JwtUtil} caches parsed claims in a static
- * {@code ThreadLocal<Map<String, Claims>>} (REQUEST_CACHE) to avoid
- * re-verifying the same token's HMAC signature multiple times within one
- * request. That is only safe because {@link JwtAuthenticationFilter}
- * unconditionally clears it in a {@code finally} block after the filter
- * chain returns - see the javadoc on {@code JwtUtil.REQUEST_CACHE} for the
- * full invariant, including why it would leak a previous request's claims
- * across requests if virtual threads were ever pooled/reused instead of
- * spawned fresh per request.
- *
- * <p>This test proves the clearing half of that invariant holds for a real
- * request through the real filter (not a mocked JwtUtil, which would never
- * touch the actual cache).
- */
+// JwtUtil's ThreadLocal claims cache is safe only because the filter clears it in finally.
 class JwtAuthenticationFilterTest {
 
     private static final String SECRET = "test-secret-key-at-least-32-characters-long-for-hmac";
@@ -56,9 +42,7 @@ class JwtAuthenticationFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 
-        // Sanity check: the token is actually parsed (and therefore cached)
-        // during the request, so the post-request assertion below is proving
-        // something was cleared, not that nothing was ever cached.
+        // The token is cached during the request, so the assertion below proves a clear.
         assertThat(jwtUtil.validateToken(token)).isTrue();
 
         filter.doFilter(request, response, chain);
@@ -74,16 +58,7 @@ class JwtAuthenticationFilterTest {
                 .isEmpty();
     }
 
-    /**
-     * The half of "sign this device out" that has to happen per request.
-     *
-     * <p>An access token is self-contained and lives fifteen minutes, so revoking the session's
-     * refresh token would leave the device that is being signed out fully authenticated for the
-     * rest of that quarter of an hour — on the one screen where somebody is acting because they
-     * believe a device is compromised. The token therefore carries its session as a {@code sid}
-     * claim and the filter asks about it, exactly as it already asks about the jti blacklist and
-     * the per-user revocation epoch.
-     */
+    // Access tokens live fifteen minutes, so a signed-out session must be refused per request.
     @Test
     void tokenFromARevokedSessionDoesNotAuthenticate() throws Exception {
         JwtUtil jwtUtil = new JwtUtil(SECRET, 900_000L, 86_400_000L);
@@ -111,11 +86,7 @@ class JwtAuthenticationFilterTest {
         }
     }
 
-    /**
-     * Tokens minted before sessions existed carry no {@code sid}. They must keep working until
-     * they expire — refusing them would have signed out everybody who was logged in across the
-     * upgrade — and must not be treated as belonging to some session.
-     */
+    // Tokens minted before sessions carry no sid and must keep working until they expire.
     @Test
     void tokenWithoutASessionStillAuthenticates() throws Exception {
         JwtUtil jwtUtil = new JwtUtil(SECRET, 900_000L, 86_400_000L);

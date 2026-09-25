@@ -45,18 +45,7 @@ import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * A record whose value is not JSON must be parked, not re-polled forever.
- *
- * <p>Without an {@code ErrorHandlingDeserializer} the failure happens inside {@code poll()}, before
- * there is a record to hand the error handler, so the DLQ recoverer never sees it: the container
- * seeks back to the same offset and every record behind the poison one on that partition waits
- * for a person to delete it.
- *
- * <p>Both consumer factories, against a real broker, with the real dead-letter template. The
- * listener-failure case is here because parking a record used to stall its partition too: the
- * records seeked back behind it stayed in asyncAcks' pending offsets and the partition stayed paused.
- */
+// Without ErrorHandlingDeserializer the failure is inside poll(), so the DLQ recoverer never sees it.
 @Testcontainers
 class KafkaPoisonRecordIntegrationTest {
 
@@ -157,11 +146,7 @@ class KafkaPoisonRecordIntegrationTest {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    /**
-     * Publishes {@code first} under the key "poison", then {@code good}, and returns what reached the
-     * listener. The listener refuses any record keyed "poison" that did deserialize, the way a
-     * listener failure reaches the error handler.
-     */
+    // The listener refuses any record keyed "poison" that did deserialize, as a listener failure.
     private <V> List<Object> runPoisonThenGood(ConcurrentKafkaListenerContainerFactory<String, V> factory,
             String topic, byte[] first, Object good) throws Exception {
         try (AdminClient admin = AdminClient.create(

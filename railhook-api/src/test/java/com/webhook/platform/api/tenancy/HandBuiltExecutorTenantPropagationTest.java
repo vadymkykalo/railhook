@@ -17,46 +17,12 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Ratchet over thread pools this module builds itself.
- *
- * <p>Spring's {@code TaskDecorator} hook reaches only the executors declared as beans in
- * {@code AsyncConfig}, whose javadoc says "every executor here gets it" — true of that file and
- * false of the codebase. Two pools were built by hand outside it, and each had grown its own
- * answer to the resulting gap: {@code AuditLogAspect} wrapped every task body in
- * {@code TenantContext.runAs}, and {@code WorkflowEngine} re-implemented
- * {@link TenantPropagatingTaskDecorator} inline — already missing its {@code captured == null}
- * pass-through, so an unscoped submission wrote {@code null} into the ThreadLocal rather than
- * leaving the worker thread's own scope alone.
- *
- * <p>Neither divergence failed anything. A task that starts with no tenant either throws
- * {@code TenantNotResolvedException} on its first session — which the audit writer's catch-all
- * swallowed into a log line — or, worse, runs under a scope left behind by the previous task on
- * that thread and stamps the wrong organization on a row.
- *
- * <p>So: a file that constructs a pool must also hand it to
- * {@link TenantPropagatingTaskDecorator#wrap}. The check is at file level on purpose — it asks
- * whether the author thought about propagation at all, not whether a particular expression is
- * shaped a particular way, and the reason is that the two ways of getting this wrong so far were
- * both "wrote something bespoke", not "wrote the wrapper slightly wrong".
- *
- * <p>Not covered, deliberately: a bare {@code @Async} with no qualifier, which lands on Spring
- * Boot's auto-configured {@code applicationTaskExecutor} rather than one of {@code AsyncConfig}'s.
- * There is one ({@code AlertNotificationService.dispatch}) and it is safe today because it touches
- * no {@code @TenantId} entity — it formats a message and makes an HTTP call. Widening this test to
- * cover it means either giving that method a decorated executor or exempting it, which is a
- * decision, not a ratchet.
- *
- * <p>Deliberately a plain {@code *Test}: it reads source files off disk and needs no Spring
- * context and no container, so it must run in the no-Docker unit job (see
- * {@code scripts/check-test-routing.sh}).
- */
+// TaskDecorator reaches only AsyncConfig's beans, so a hand-built pool must use TenantPropagatingTaskDecorator.wrap.
 @Tag("ratchet")
 class HandBuiltExecutorTenantPropagationTest {
 
     private static final Path SOURCE_ROOT = Paths.get("src/main/java");
 
-    /** {@code Executors.newFixedThreadPool(…)}, {@code new ThreadPoolExecutor(…)}, and friends. */
     private static final Pattern BUILDS_A_POOL = Pattern.compile(
             "Executors\\s*\\.\\s*new\\w+\\s*\\("
                     + "|new\\s+(Scheduled)?ThreadPoolExecutor\\s*\\("
@@ -64,13 +30,7 @@ class HandBuiltExecutorTenantPropagationTest {
 
     private static final String WRAPPED = "TenantPropagatingTaskDecorator.wrap(";
 
-    /**
-     * Files that build a pool and deliberately do not wrap it, with the reason each is acceptable.
-     * Format is the path relative to {@code src/main/java}.
-     *
-     * <p>Empty, and meant to stay that way. Adding an entry is a tenancy decision: say which
-     * organization the pool's tasks run under instead, and why the wrapper is wrong for it.
-     */
+    // Empty, and meant to stay so: an entry must say which organization the pool's tasks run under.
     private static final Set<String> DOCUMENTED_EXEMPTIONS = new TreeSet<>(Set.of());
 
     @Test

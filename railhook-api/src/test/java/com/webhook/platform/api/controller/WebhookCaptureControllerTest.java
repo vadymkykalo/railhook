@@ -24,11 +24,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * A test endpoint exists to show someone what their provider sends. A form POST bound as a String
- * was a body Spring rebuilt from parsed parameters — {@code %20} shown as {@code +} — so the
- * capture showed a request nobody sent, and a signature computed over it did not match.
- */
+// A form POST bound as a String was rebuilt from parsed params, so the capture showed a request nobody sent.
 class WebhookCaptureControllerTest {
 
     private TestEndpointService testEndpointService;

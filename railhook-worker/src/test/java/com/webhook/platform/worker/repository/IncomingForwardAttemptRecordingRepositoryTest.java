@@ -54,14 +54,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 
-/**
- * What a Forward's attempt row says was sent, written by the real store into a real Postgres after
- * a real HTTP request — the whole path the dashboard's "Request body" is read back from.
- *
- * <p>The store and the Runner each have unit tests that pass a fake to the other, so neither could
- * notice a body that was sent but never landed on the row. Production reported exactly that: an
- * incoming forward attempt with an empty request body.
- */
+// The store and Runner unit tests fake each other; production once recorded an empty request body.
 @DataJpaTest
 @Testcontainers
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -218,7 +211,7 @@ class IncomingForwardAttemptRecordingRepositoryTest {
         }
     }
 
-    /** Every Project active: whether a Project may still be sent for is not what this test is about. */
+    // Every Project active: project status is not what this test is about.
     private static ProjectStatusLookup activeProjects() {
         return new ProjectStatusLookup(null) {
             @Override

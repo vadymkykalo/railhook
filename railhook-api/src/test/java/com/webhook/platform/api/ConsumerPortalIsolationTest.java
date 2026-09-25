@@ -48,15 +48,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-/**
- * A portal session is a bearer token handed to someone who is not a Railhook user at all: the
- * customer's own Consumer. Everything it reaches must be that Consumer's — never a sibling
- * Consumer's, never the project's unassigned endpoints, never another project's or another
- * organization's — and it must reach nothing outside {@code /api/v1/portal/**}.
- *
- * <p>Billing is on so the Free plan's endpoint quota is real: an endpoint a Consumer creates is
- * still one of the project's endpoints.
- */
+// Billing on so the Free plan's endpoint quota is real.
 @TestPropertySource(properties = "billing.enabled=true")
 public class ConsumerPortalIsolationTest extends AbstractIntegrationTest {
 
@@ -106,7 +98,7 @@ public class ConsumerPortalIsolationTest extends AbstractIntegrationTest {
     private static UUID consumerInProjectB;
     private static UUID consumerInOtherOrg;
 
-    /** Endpoints a test made in project A, retired after it so the Free plan's five never fill up. */
+    // Retired after each test so the Free plan's five endpoints never fill up.
     private final List<UUID> endpointsToRetire = new ArrayList<>();
 
     @BeforeEach
@@ -141,8 +133,6 @@ public class ConsumerPortalIsolationTest extends AbstractIntegrationTest {
             endpointRepository.saveAndFlush(endpoint);
         }));
     }
-
-    // ── The token ──
 
     @Test
     void theTokenIsReturnedOnceAndStoredOnlyAsItsHash() throws Exception {
@@ -237,8 +227,6 @@ public class ConsumerPortalIsolationTest extends AbstractIntegrationTest {
         assertEquals(403, withKey(get("/api/v1/portal/session"), null).getResponse().getStatus());
         assertEquals(403, withJwt(get("/api/v1/portal/session"), jwt, null).getResponse().getStatus());
     }
-
-    // ── Endpoints ──
 
     @Test
     void anEndpointCreatedThroughThePortalBelongsToTheConsumer() throws Exception {
@@ -351,8 +339,6 @@ public class ConsumerPortalIsolationTest extends AbstractIntegrationTest {
         assertEquals(consumerOne.toString(), found.get("content").get(0).get("id").asText());
     }
 
-    // ── Deliveries ──
-
     @Test
     void deliveriesAttemptsAndRetriesAreConfinedToTheConsumersEndpoints() throws Exception {
         UUID ownEndpoint = createEndpointFor(projectA, consumerOne, OWN_URL);
@@ -382,8 +368,6 @@ public class ConsumerPortalIsolationTest extends AbstractIntegrationTest {
         assertEquals(DeliveryStatus.PENDING, deliveryRepository.findById(own.getId()).orElseThrow().getStatus());
     }
 
-    // ── Lifecycle ──
-
     @Test
     void deletingAConsumerRemovesItsEndpointsAndEndsItsSessions() throws Exception {
         UUID consumer = createConsumer(projectA, keyA, null, "leaving-" + UUID.randomUUID(), "Leaving");
@@ -397,8 +381,6 @@ public class ConsumerPortalIsolationTest extends AbstractIntegrationTest {
                 "a deleted consumer's endpoints stop receiving");
         assertEquals(404, withKey(get(consumerPath(projectA, consumer)), null).getResponse().getStatus());
     }
-
-    // ── Quota ──
 
     @Test
     void portalEndpointsCountAgainstTheProjectsEndpointQuota() throws Exception {
@@ -416,8 +398,6 @@ public class ConsumerPortalIsolationTest extends AbstractIntegrationTest {
         assertEquals(402, overQuota.getResponse().getStatus(), overQuota.getResponse().getContentAsString());
         assertEquals(FREE_MAX_ENDPOINTS_PER_PROJECT, endpointRepository.countByProjectIdAndDeletedAtIsNull(project));
     }
-
-    // ── helpers ──
 
     private String consumerPath(UUID project, UUID consumer) {
         return "/api/v1/projects/" + project + "/consumers/" + consumer;
