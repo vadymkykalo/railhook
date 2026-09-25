@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **`install.sh` is less than half as long** (1,325 lines to about 550) and does the same install:
+  the same flags, the same `.env`, Caddy for `--domain`, the same checks before it starts
+  anything, and the same zero-downtime `./railhook upgrade`. The machine check now
+  stops only without Docker, Compose, 2 GiB of RAM or a free port; low memory or disk is a
+  warning. The README shows the plain `docker compose` install first, with the installer as the
+  one-line option.
+- **The `./railhook` helper lost `monitoring`** (`up`, `down`, `status`, `logs`, `update`). The
+  monitoring stack is a second Compose project and runs with
+  `docker compose -p railhook-monitoring --env-file .env -f monitoring/docker-compose.yml up -d`;
+  `upgrade` no longer downloads `monitoring/` for the new release (the monitoring docs show the
+  one-line download). `./railhook start|stop|restart|status|logs|upgrade|backup|doctor` are
+  unchanged, and anything else still goes to Docker Compose. To change a setting by hand, edit
+  `.env` and run `./railhook start`.
+
 ## [2.30.2] - 2026-09-22
 
 ### Fixed

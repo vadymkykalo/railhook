@@ -27,23 +27,38 @@ from any provider, with every delivery on record.**
 
 ## Install
 
+Railhook is one Compose file and a `.env`. With Docker and Compose v2 (about 4 GiB of RAM):
+
+```bash
+mkdir railhook && cd railhook
+curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/railhook/main/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/railhook/main/.env.dist -o .env
+# Replace the example secrets with your own, and turn on the bundled Postgres.
+for v in WEBHOOK_ENCRYPTION_KEY WEBHOOK_ENCRYPTION_SALT JWT_SECRET REDIS_PASSWORD; do
+  sed -i "s|^$v=.*|$v=$(openssl rand -hex 32)|" .env
+done
+db=$(openssl rand -hex 24)
+sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$db|; s|^DB_PASSWORD=.*|DB_PASSWORD=$db|" .env
+echo "COMPOSE_PROFILES=embedded-db" >> .env
+docker compose up -d
+```
+
+Open **http://localhost:8080** and register — the first account is active immediately.
+
+Or let the installer do the same in one line. It checks the machine, pins the latest release,
+generates the secrets and adds a `./railhook` helper (`status | logs | upgrade | backup | doctor`):
+
 ```bash
 curl -fsSL https://railhook.io/install.sh | bash
 ```
 
-On a server with a domain pointed at it, get HTTPS in the same step:
+On a server with a domain pointed at it, it sets up HTTPS in the same step:
 
 ```bash
 curl -fsSL https://railhook.io/install.sh | bash -s -- --domain hooks.example.com --email ops@example.com
 ```
 
 Already running a reverse proxy? Add `--behind-proxy` instead of `--email`. Then point the proxy at `127.0.0.1:8080`.
-
-Open **http://localhost** and register — the first account is active immediately.
-
-- Checks the machine first: Docker with Compose v2, about 4 GiB of RAM, 5 GiB of disk, a free port.
-- Writes a Compose file pinned to the latest release and a `.env` with freshly generated secrets.
-- Starts everything behind one port. Day two is `./railhook status | logs | upgrade | backup | doctor`.
 
 Rather not run it yourself? Railhook Cloud at https://railhook.io is free right now (10,000 events
 a month, 3 projects, 7 days of history). Paid plans with support and higher limits will come later.

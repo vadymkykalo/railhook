@@ -116,12 +116,14 @@ Neither is required, or wanted, for self-hosting.
 
 ## Changing settings on a Compose install
 
-`./railhook settings < file` applies `NAME=value` lines to `.env` in one step: existing names are
-replaced in place, new ones appended, and the names are printed with `changed`, `unchanged` or
-`added` — never the values. `./railhook upgrade` reads the same lines from stdin, so an
-automated deploy can send settings and a release together: that is how `railhook.io` is
+By hand: edit `.env` in the install directory, then `./railhook start`, which recreates the
+containers whose configuration changed. `./railhook restart` does not re-read `.env`.
+
+For an automated deploy, `./railhook upgrade` reads `NAME=value` lines from stdin and applies
+them to `.env` before anything else changes: existing names are replaced in place, new ones
+appended, and only the names are printed, never the values. That is how `railhook.io` is
 configured (GitHub environment `production`, `DOTENV_<NAME>` variables and secrets — see
-`docs/RELEASING.md`).
+`docs/RELEASING.md`). `./railhook settings < file` is the same step on its own.
 
 Refused, with nothing written: the encryption key and salt, `JWT_SECRET`, the Postgres and Redis
 passwords, and the image tags. The first four were generated on the host and are already in use
@@ -270,8 +272,9 @@ port, so Prometheus can scrape without a JWT/API-key — the app's main-port
 auth" for the full rationale. The Helm chart splits the port the same way, and
 its `ServiceMonitor` scrapes the management port by name.
 
-Alerting: the monitoring stack (`./railhook monitoring up` on an install.sh host,
-`make monitoring-up` in a clone; needs `GRAFANA_ADMIN_PASSWORD` in `.env`) runs
+Alerting: the monitoring stack (a second Compose project, `docker compose -p
+railhook-monitoring -f monitoring/docker-compose.yml` on an install.sh host, `make
+monitoring-up` in a clone; needs `GRAFANA_ADMIN_PASSWORD` in `.env`) runs
 Alertmanager, which routes `monitoring/prometheus/alerts.yml` (the platform) and
 `host-alerts.yml` (disk, memory, containers, uptime, TLS, backups, error logs) to
 email/Slack/webhook/Telegram via the `ALERTMANAGER_*` env vars (`.env.dist`). Only

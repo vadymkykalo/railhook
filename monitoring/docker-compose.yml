@@ -3,7 +3,7 @@
 # Its own Compose project next to the platform, joined to the platform's network so
 # Prometheus can scrape the management ports and Caddy can reach Grafana:
 #
-#   ./railhook monitoring up|down|status|logs     (an install.sh deployment)
+#   docker compose -p railhook-monitoring --env-file .env -f monitoring/docker-compose.yml up -d   (an install.sh deployment)
 #   make monitoring-up / monitoring-down          (a clone)
 #
 # Both read the platform's .env (--env-file) and pin the project name, because that .env
@@ -323,5 +323,5 @@ networks:
   railhook:
     external: true
     # The platform's network: <project>_webhook-network. /opt/railhook gives
-    # railhook_webhook-network; the helper and the Makefile detect it and pass it here.
+    # railhook_webhook-network; the Makefile detects it, otherwise set RAILHOOK_NETWORK in .env.
     name: ${RAILHOOK_NETWORK:-railhook_webhook-network}

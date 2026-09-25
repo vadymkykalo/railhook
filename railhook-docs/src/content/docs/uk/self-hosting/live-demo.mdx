@@ -28,10 +28,10 @@ import { Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 <Steps>
 
-1. **Задайте змінну** допоміжним скриптом, який запише її в `.env`:
+1. **Задайте змінну** у `.env` у каталозі встановлення; якщо рядка ще немає, додайте його:
 
-   ```bash
-   printf 'DEMO_ENABLED=true\n' | ./railhook settings
+   ```bash title=".env"
+   DEMO_ENABLED=true
    ```
 
 2. **Перестворіть контейнери**, щоб її прочитали і API, і панель:

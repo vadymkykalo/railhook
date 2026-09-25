@@ -302,7 +302,7 @@
           "name": "PLATFORM_ADMIN_EMAILS",
           "default": "",
           "example": null,
-          "description": "People who may open the platform admin panel (Platform admin in the dashboard's sidebar,\n/admin/platform) with their ordinary sign-in: a comma-separated list of email addresses.\nBeing listed is not enough on its own — the address must be verified, the account active,\nand the sign-in less than 12 hours old; every admin request is rate-limited and written to\nthe audit log. An organization OWNER is not a platform admin unless listed here. Encryption\nkey rotation stays on PLATFORM_ADMIN_TOKEN only.\nEmpty means nobody: no panel, and the admin API refuses every signed-in user. There is no\n\"first account becomes the admin\". install.sh --admin-email <address> sets it at install time\n(or with --refresh); later, pipe PLATFORM_ADMIN_EMAILS=<addresses> into ./railhook settings and\nrun ./railhook start.\nExample: PLATFORM_ADMIN_EMAILS=ops@example.com,oncall@example.com"
+          "description": "People who may open the platform admin panel (Platform admin in the dashboard's sidebar,\n/admin/platform) with their ordinary sign-in: a comma-separated list of email addresses.\nBeing listed is not enough on its own — the address must be verified, the account active,\nand the sign-in less than 12 hours old; every admin request is rate-limited and written to\nthe audit log. An organization OWNER is not a platform admin unless listed here. Encryption\nkey rotation stays on PLATFORM_ADMIN_TOKEN only.\nEmpty means nobody: no panel, and the admin API refuses every signed-in user. There is no\n\"first account becomes the admin\". install.sh --admin-email <address> sets it at install time\n(or with --refresh); later, set it here and run ./railhook start.\nExample: PLATFORM_ADMIN_EMAILS=ops@example.com,oncall@example.com"
         }
       ]
     },
@@ -1879,7 +1879,7 @@
           "name": "GRAFANA_ADMIN_PASSWORD",
           "default": "",
           "example": null,
-          "description": "Prometheus, Alertmanager, Grafana, Loki, node-exporter, cAdvisor and\nblackbox-exporter, as a second Compose project: `./railhook monitoring up` on an\ninstall.sh deployment, `make monitoring-up` in a clone. Nothing below does\nanything until it is started. Only Grafana is published, on loopback.\n\nGrafana's admin password. Required: the stack refuses to start without it, or\nwith anything shorter than 16 characters. Generate one with\n`openssl rand -base64 24`. It is re-applied on every start, so changing it\nhere and running `./railhook monitoring up` changes it in Grafana too."
+          "description": "Prometheus, Alertmanager, Grafana, Loki, node-exporter, cAdvisor and\nblackbox-exporter, as a second Compose project (`docker compose -p\nrailhook-monitoring -f monitoring/docker-compose.yml up -d`, or `make monitoring-up` in a clone;\nsee monitoring/README.md). Nothing below does\nanything until it is started. Only Grafana is published, on loopback.\n\nGrafana's admin password. Required: the stack refuses to start without it, or\nwith anything shorter than 16 characters. Generate one with\n`openssl rand -base64 24`. It is re-applied on every start, so changing it\nhere and starting the stack again changes it in Grafana too."
         },
         {
           "name": "GRAFANA_ADMIN_USER",
@@ -1897,7 +1897,7 @@
           "name": "MONITORING_DOMAIN",
           "default": "",
           "example": null,
-          "description": "A host name to serve Grafana on through the built-in Caddy, e.g.\ngrafana.example.com. Empty keeps it loopback-only. Point DNS at this host and\nput an identity-aware proxy (Cloudflare Access, for one) in front: Grafana's\nlogin alone should not be what stands between the internet and your logs."
+          "description": "A host name to serve Grafana on through the built-in Caddy, e.g.\ngrafana.example.com. Empty keeps it loopback-only. Point DNS at this host and\nput an identity-aware proxy (Cloudflare Access, for one) in front: Grafana's\nlogin alone should not be what stands between the internet and your logs.\ninstall.sh --refresh, and every ./railhook upgrade, writes it into the Caddyfile."
         },
         {
           "name": "MONITORING_TLS_CERT",

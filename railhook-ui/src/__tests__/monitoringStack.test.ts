@@ -1,9 +1,9 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -187,7 +187,7 @@ describe('the default Grafana password', () => {
   const OLD = 'railhook_monitor_2024';
 
   it('appears nowhere except in the check that refuses it', () => {
-    const allowed = new Set(['monitoring/grafana/entrypoint.sh', 'install.sh']);
+    const allowed = new Set(['monitoring/grafana/entrypoint.sh']);
     const walk = (dir: string): string[] =>
       readdirSync(join(repoRoot, dir)).flatMap((entry) => {
         const path = join(dir, entry);
@@ -362,7 +362,10 @@ describe('the Caddyfile install.sh writes', () => {
     expect(end).toBeGreaterThan(start);
     const dir = scratch('railhook-caddy-');
     if (envFile !== null) writeFileSync(join(dir, '.env'), envFile);
-    const script = `set -euo pipefail\nwarn() { echo "$*" >&2; }\n${installer.slice(start, end + '\nCADDY\n}\n'.length)}\nwrite_caddyfile\n`;
+    // write_caddyfile reads .env through env_get, so the harness defines it the same way.
+    const envGet = /^env_get\(\) .*$/m.exec(installer);
+    expect(envGet, 'env_get in install.sh').not.toBeNull();
+    const script = `set -euo pipefail\nwarn() { echo "$*" >&2; }\n${envGet![0]}\n${installer.slice(start, end + '\nCADDY\n}\n'.length)}\nwrite_caddyfile\n`;
     const result = spawnSync('bash', ['-c', script], { encoding: 'utf8', env: { PATH: process.env.PATH ?? '/usr/bin:/bin', INSTALL_DIR: dir } });
     expect(result.status, result.stderr).toBe(0);
     return { caddyfile: readFileSync(join(dir, 'Caddyfile'), 'utf8'), log: result.stderr };
@@ -404,70 +407,5 @@ describe('the Caddyfile install.sh writes', () => {
     const { caddyfile, log } = writeCaddyfile('MONITORING_DOMAIN=evil.example {\n');
     expect(caddyfile).not.toContain('railhook-grafana');
     expect(log).toMatch(/not a hostname/);
-  });
-});
-
-describe('railhook monitoring', () => {
-  function helperSource(): string {
-    const installer = read('install.sh');
-    const start = installer.indexOf(`<<'HELPER'\n`);
-    const end = installer.indexOf('\nHELPER\n', start);
-    return installer.slice(start + `<<'HELPER'\n`.length, end + 1);
-  }
-
-  it("hands the stack this server's name unless .env names another", () => {
-    expect(helperSource()).toMatch(/MONITORING_NODENAME="\$\(env_value MONITORING_NODENAME \| grep \. \|\| hostname\)"/);
-  });
-
-  it('fetches exactly the files monitoring/ holds', () => {
-    const listed = /^MONITORING_FILES="\n([\s\S]*?)"$/m.exec(helperSource())?.[1].trim().split('\n').sort();
-    const walk = (dir: string): string[] =>
-      readdirSync(dir).flatMap((entry) => {
-        const path = join(dir, entry);
-        return statSync(path).isDirectory() ? walk(path) : [path];
-      });
-    const root = join(repoRoot, 'monitoring');
-    const onDisk = walk(root)
-      .map((f) => relative(root, f))
-      .filter((f) => f !== 'README.md')
-      .sort();
-    expect(listed).toEqual(onDisk);
-  });
-
-  function install(env: string) {
-    const dir = scratch('railhook-mon-');
-    const bin = join(dir, 'bin');
-    mkdirSync(bin);
-    writeFileSync(join(bin, 'docker'), '#!/bin/sh\necho "docker $*" >> "$(dirname "$0")/calls"\nexit 0\n');
-    chmodSync(join(bin, 'docker'), 0o755);
-    writeFileSync(join(bin, 'curl'), '#!/bin/sh\necho "curl $*" >> "$(dirname "$0")/calls"\nexit 1\n');
-    chmodSync(join(bin, 'curl'), 0o755);
-    writeFileSync(join(dir, 'railhook'), helperSource());
-    chmodSync(join(dir, 'railhook'), 0o755);
-    writeFileSync(join(dir, '.env'), env);
-    const run = (...args: string[]) => {
-      const r = spawnSync('bash', [join(dir, 'railhook'), 'monitoring', ...args], {
-        encoding: 'utf8',
-        env: { PATH: `${bin}:${process.env.PATH ?? '/usr/bin:/bin'}`, HOME: dir },
-      });
-      const calls = existsSync(join(bin, 'calls')) ? readFileSync(join(bin, 'calls'), 'utf8') : '';
-      return { status: r.status, out: `${r.stdout}${r.stderr}`, calls };
-    };
-    return { run };
-  }
-
-  it('will not start without a Grafana password of its own, and starts nothing', () => {
-    for (const env of ['API_IMAGE_TAG=2.20.0\n', 'GRAFANA_ADMIN_PASSWORD=railhook_monitor_2024\n', 'GRAFANA_ADMIN_PASSWORD=tooshort\n']) {
-      const { status, out, calls } = install(env).run('up');
-      expect(status, env).not.toBe(0);
-      expect(out).toMatch(/GRAFANA_ADMIN_PASSWORD/);
-      expect(calls, 'no compose up, no download').not.toMatch(/ up |curl/);
-    }
-  });
-
-  it('says what it does when asked nothing', () => {
-    const { status, out } = install('').run();
-    expect(status).not.toBe(0);
-    expect(out).toMatch(/monitoring up\|down\|status/);
   });
 });
