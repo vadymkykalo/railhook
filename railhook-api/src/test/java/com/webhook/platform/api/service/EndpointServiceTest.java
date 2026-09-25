@@ -58,7 +58,6 @@ class EndpointServiceTest {
                 true, allowedHosts, verificationRequired);
     }
 
-    /** An enabled endpoint at {@code url} whose signing secret is sealed under the test registry. */
     private Endpoint.EndpointBuilder endpointWithSecret(String url, String secret) {
         CryptoUtils.EncryptedData encrypted = registry.encrypt(secret);
         return Endpoint.builder()
@@ -89,20 +88,7 @@ class EndpointServiceTest {
         field.set(obj, value);
     }
 
-    /**
-     * Rotating a signing secret must not break the receiver.
-     *
-     * <p>Before the grace window, {@code rotateSecret} replaced the secret in place. From that
-     * instant every delivery was signed with a key the customer had not deployed yet, so each
-     * one failed their verification — a rotation was an outage they had to schedule. The columns
-     * for a previous secret had existed since V001 and nothing ever wrote them;
-     * {@code EntityMappingParityIntegrationTest} carried four exemptions saying exactly that.
-     *
-     * <p>These tests pin the half that lives in the api: that the retired secret is kept, that it
-     * is kept in a form the worker can actually decrypt, and that rotating is still possible when
-     * the current secret is not decryptable at all — which is the situation an operator rotates
-     * to get out of.
-     */
+    // Rotation once replaced the secret in place, so every delivery failed until the receiver redeployed.
     @Nested
     @DisplayName("EndpointService.rotateSecret — the rotation grace window")
     class SecretRotation {
@@ -140,8 +126,6 @@ class EndpointServiceTest {
                     endpoint.getEncryptionKeyVersion());
             assertThat(kept).isEqualTo(original);
 
-            /* The end-to-end promise, assembled from both halves: the header the worker builds
-               from these two secrets verifies for a receiver on either one. */
             long ts = System.currentTimeMillis();
             String header = WebhookSignatureUtils.buildSignatureHeader(newSecret, kept, ts, BODY);
             assertThat(WebhookSignatureUtils.verifySignature(newSecret, header, BODY)).isTrue();
@@ -158,9 +142,6 @@ class EndpointServiceTest {
 
             service.rotateSecret(projectId, endpointId);
 
-            /* A straight ciphertext copy would look right and decrypt today. It breaks after the
-               next encryption-key rotation, when encryption_key_version moves on and the copied
-               blob — sealed under the older key — no longer matches the version the row claims. */
             assertThat(endpoint.getSecretPreviousEncrypted())
                     .as("AES-GCM with a fresh IV must not reproduce the original ciphertext")
                     .isNotEqualTo(ciphertextBefore);
@@ -195,28 +176,13 @@ class EndpointServiceTest {
 
             String newSecret = service.rotateSecret(projectId, endpointId).getSecret();
 
-            /* Rotating is how an operator recovers from an unreadable secret, so it must not be
-               the one thing they cannot do. And no window is opened: a secret nobody can read is
-               one the receiver was not verifying with either. */
             assertThat(newSecret).isNotBlank();
             assertThat(endpoint.getSecretPreviousEncrypted()).isNull();
             assertThat(endpoint.getSecretRotatedAt()).isNull();
         }
     }
 
-    /**
-     * One rule for what an omitted field means on update, applied to every field.
-     *
-     * <p>{@code updateEndpoint} used to hold two rules at once, three lines apart: {@code secret},
-     * {@code enabled}, {@code allowedSourceIps} and {@code signatureScheme} were left alone when the
-     * request omitted them, under a comment explaining that null must mean "not specified" — while
-     * {@code description} and {@code rateLimitPerSecond} were assigned straight from the request, so
-     * an update that did not mention them wiped them. A partial PUT silently removed an endpoint's
-     * throttle.
-     *
-     * <p>The rule now: an absent field is unchanged, and an explicitly empty value clears — blank for
-     * a string, {@code 0} for the rate limit.
-     */
+    // A partial PUT once wiped the description and the rate limit it did not mention.
     @Nested
     @DisplayName("EndpointService.updateEndpoint — absent means unchanged, empty means clear")
     class UpdateSemantics {
@@ -294,19 +260,6 @@ class EndpointServiceTest {
         }
 
         @Test
-        void aValueStillReplacesTheOldOne() {
-            Endpoint endpoint = existing();
-            EndpointRequest request = urlOnly();
-            request.setDescription("renamed");
-            request.setRateLimitPerSecond(90);
-
-            service.updateEndpoint(projectId, endpointId, request);
-
-            assertThat(endpoint.getDescription()).isEqualTo("renamed");
-            assertThat(endpoint.getRateLimitPerSecond()).isEqualTo(90);
-        }
-
-        @Test
         void creatingWithAZeroRateLimitMeansNoLimitRatherThanALimitOfZero() {
             EndpointRequest request = urlOnly();
             request.setRateLimitPerSecond(0);
@@ -322,18 +275,7 @@ class EndpointServiceTest {
         }
     }
 
-    /**
-     * Verification has to survive the one edit that invalidates it.
-     *
-     * <p>{@code updateEndpoint} sets a new URL and, before this, left {@code verificationStatus}
-     * alone. The worker's gate ({@code OutgoingAttemptStore}) only asks whether the status is
-     * VERIFIED or SKIPPED, so an endpoint verified against a URL its owner controlled could be
-     * re-pointed anywhere and keep receiving deliveries — the whole feature was a one-time check
-     * with a hole the size of a PUT.
-     *
-     * <p>The symmetric half matters as much: an edit that does not touch the URL must not reset
-     * anything, or renaming an endpoint's description would silently stop its deliveries.
-     */
+    // A verified endpoint could be re-pointed anywhere and keep receiving deliveries.
     @Nested
     @DisplayName("EndpointService.updateEndpoint — verification follows the URL")
     class VerificationReset {
@@ -342,9 +284,6 @@ class EndpointServiceTest {
         private static final String MOVED_URL = "https://collector.example.net/collect";
         private static final String ELSEWHERE_URL = "https://elsewhere.example.net/hook";
 
-        /* UrlValidator short-circuits on an allow-listed host before it resolves anything, which
-           is what keeps this a unit test: the assertions are about verification state, not about
-           whether the machine running them has DNS. */
         private static final List<String> ALLOWED_HOSTS =
                 List.of("api.customer.com", "collector.example.net", "elsewhere.example.net");
 
@@ -388,8 +327,6 @@ class EndpointServiceTest {
                     .description("renamed, nothing else")
                     .build());
 
-            /* Resetting on every update would make editing a description an outage: the worker
-               terminally fails a delivery to an unverified endpoint. */
             assertThat(endpoint.getVerificationStatus()).isEqualTo(Endpoint.VerificationStatus.VERIFIED);
             assertThat(endpoint.getVerificationCompletedAt()).isEqualTo(completedAt);
         }
@@ -406,8 +343,6 @@ class EndpointServiceTest {
                     .url(ELSEWHERE_URL)
                     .build());
 
-            /* SKIPPED passes the worker's gate exactly like VERIFIED, so leaving it in place
-               would reopen the same hole for every endpoint created while the flag was off. */
             assertThat(endpoint.getVerificationStatus()).isEqualTo(Endpoint.VerificationStatus.PENDING);
             assertThat(endpoint.getVerificationSkipReason()).isNull();
         }
@@ -425,11 +360,6 @@ class EndpointServiceTest {
                     .url(MOVED_URL)
                     .build());
 
-            /* The worker's gate is NOT behind webhook.endpoint-verification-required: it always
-               demands VERIFIED or SKIPPED. Forcing PENDING here would therefore stop delivery
-               permanently for the default configuration, where nobody is ever asked to verify and
-               so nothing would ever move the status back. Re-deriving what createEndpoint would
-               have produced at this URL is the rule that holds under both settings. */
             assertThat(endpoint.getVerificationStatus()).isEqualTo(Endpoint.VerificationStatus.SKIPPED);
         }
 

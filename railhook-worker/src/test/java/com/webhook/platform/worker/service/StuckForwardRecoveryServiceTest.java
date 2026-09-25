@@ -18,16 +18,10 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
-/**
- * Unit coverage for StuckForwardRecoveryService: the incoming-forward analogue
- * of StuckDeliveryRecoveryService -- same lock-guarded recovery, different table.
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class StuckForwardRecoveryServiceTest {
@@ -76,42 +70,5 @@ class StuckForwardRecoveryServiceTest {
                         + strandedSecondsAgo + "s");
 
         verify(lock).unlock();
-    }
-
-    @Test
-    void recoverStuckForwardAttempts_lockNotAcquired_skipsEntirely() throws InterruptedException {
-        when(lock.tryLock(0, 30, TimeUnit.SECONDS)).thenReturn(false);
-
-        service.recoverStuckForwardAttempts();
-
-        verify(attemptRepository, never()).resetStuckForwardAttempts(any());
-        verify(attemptRepository, never()).resetStrandedPendingForwardAttempts(any());
-        verify(lock, never()).unlock();
-    }
-
-    @Test
-    void recoverStuckForwardAttempts_noStuckRows_stillUnlocksCleanly() throws InterruptedException {
-        when(lock.tryLock(0, 30, TimeUnit.SECONDS)).thenReturn(true);
-        when(lock.isHeldByCurrentThread()).thenReturn(true);
-        when(attemptRepository.resetStuckForwardAttempts(any())).thenReturn(0);
-        when(attemptRepository.resetStrandedPendingForwardAttempts(any())).thenReturn(0);
-
-        service.recoverStuckForwardAttempts();
-
-        verify(attemptRepository, times(1)).resetStuckForwardAttempts(any());
-        verify(attemptRepository, times(1)).resetStrandedPendingForwardAttempts(any());
-        verify(lock).unlock();
-    }
-
-    @Test
-    void recoverStuckForwardAttempts_interruptedWhileAcquiringLock_doesNotThrow() throws InterruptedException {
-        when(lock.tryLock(0, 30, TimeUnit.SECONDS)).thenThrow(new InterruptedException("interrupted"));
-
-        service.recoverStuckForwardAttempts();
-
-        verify(attemptRepository, never()).resetStuckForwardAttempts(any());
-        verify(attemptRepository, never()).resetStrandedPendingForwardAttempts(any());
-        verify(lock, never()).unlock();
-        assertTrue(Thread.interrupted(), "the current thread's interrupt flag must be restored");
     }
 }

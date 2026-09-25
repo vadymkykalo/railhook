@@ -14,26 +14,12 @@ import java.util.HexFormat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * A signature is over the bytes that arrived, not over our copy of them.
- *
- * <p>The verifiers took a {@code String}. Spring produces that String by decoding the request
- * with whatever charset the {@code Content-Type} declared, and every verifier then encoded it
- * back as UTF-8 to compute the HMAC. For any sender that did not use UTF-8 those are different
- * bytes, so a genuine webhook failed verification — and nothing in the request said why, because
- * the signature really did not match the thing we hashed.
- *
- * <p>The body below is the UTF-8 encoding of "café". Read as ISO-8859-1 it decodes to five
- * characters rather than four, and re-encoding those as UTF-8 gives seven bytes instead of five.
- * That is the whole bug, and it is what these tests hold the verifiers to: the same bytes verify
- * whatever the request claimed about them.
- */
+// Verifiers hashed a charset round-trip of the body, so genuine non-UTF-8 webhooks failed.
 class RawBodyVerificationTest {
 
     private static final String SECRET = "whsec_test_secret";
     private static final byte[] BODY = "{\"note\":\"café\"}".getBytes(StandardCharsets.UTF_8);
 
-    /** What the round trip through ISO-8859-1 would have produced — the bytes we used to hash. */
     private static byte[] reEncoded() {
         return new String(BODY, StandardCharsets.ISO_8859_1).getBytes(StandardCharsets.UTF_8);
     }
@@ -125,8 +111,6 @@ class RawBodyVerificationTest {
     @Test
     @DisplayName("and the String overload still agrees with it, because we produce those bytes")
     void stringOverloadStillMatches() {
-        // Outgoing delivery signs a body this platform built, so UTF-8 there is a fact rather
-        // than an assumption. The two overloads must not disagree about it.
         long ts = System.currentTimeMillis();
         String body = "{\"note\":\"café\"}";
 
@@ -138,8 +122,6 @@ class RawBodyVerificationTest {
     @Test
     @DisplayName("a signature over the re-encoded bytes is now correctly rejected")
     void theOldBehaviourIsNotQuietlyStillAccepted() {
-        // Belt and braces: if a verifier were still hashing the round-tripped form, this would
-        // pass and the tests above would pass too, and nothing would have changed.
         HttpServletRequest r = request("application/json; charset=iso-8859-1");
         ((MockHttpServletRequest) r).addHeader("X-Hub-Signature-256", "sha256=" + hmacHex(SECRET, reEncoded()));
 

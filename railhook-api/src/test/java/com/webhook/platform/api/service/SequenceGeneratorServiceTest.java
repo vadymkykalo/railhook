@@ -12,7 +12,10 @@ import org.mockito.quality.Strictness;
 import org.redisson.api.RAtomicLong;
 import org.redisson.api.RedissonClient;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -29,16 +32,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/**
- * Unit coverage for SequenceGeneratorService -- previously had no tests despite
- * being the sole source of the sequence numbers FIFO ordering depends on.
- *
- * <p>RAtomicLong is mocked with stateful answers (backed by a plain AtomicLong/AtomicBoolean)
- * rather than fixed return values, because these tests need to exercise the actual
- * exists/compare-and-set semantics the reseed logic depends on, mirroring how Redis itself
- * behaves (a never-set key reports {@code isExists() == false} and {@code get() == 0}, and
- * {@code compareAndSet(0, x)} is the atomic "claim the still-absent key" primitive).
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class SequenceGeneratorServiceTest {
@@ -61,7 +54,7 @@ class SequenceGeneratorServiceTest {
         return UUID.randomUUID();
     }
 
-    /** Wires a fresh stateful fake RAtomicLong (starts absent) for the given endpoint's key. */
+    // Stateful fake: the reseed logic depends on real exists/compare-and-set semantics.
     private RAtomicLong wireFakeCounter(UUID endpointId) {
         RAtomicLong counter = mock(RAtomicLong.class);
         AtomicLong value = new AtomicLong(0);
@@ -90,21 +83,15 @@ class SequenceGeneratorServiceTest {
         return counter;
     }
 
-    // ── 23c: counter survives a simulated Redis flush ───────────────────
-
     @Test
     void nextSequence_cacheMiss_reseedsFromDurableHighWaterMark() {
         UUID endpointId = endpointId();
-        // Redis was flushed: the key doesn't exist. Postgres already durably holds sequence 100
-        // from before the flush.
         wireFakeCounter(endpointId);
         when(deliveryRepository.findMaxSequenceNumber(endpointId)).thenReturn(100L);
 
         long next = service.nextSequence(endpointId);
 
-        assertEquals(101L, next,
-                "Must continue from the durable high-water mark, not restart at 1 -- restarting " +
-                        "would collide with/never satisfy canDeliver against the already-advanced cursor");
+        assertEquals(101L, next, "must continue from the durable high-water mark after a Redis flush");
         assertEquals(1.0, meterRegistry.counter("webhook_sequence_reseeded_total").count());
     }
 
@@ -117,8 +104,7 @@ class SequenceGeneratorServiceTest {
         long next = service.nextSequence(endpointId);
 
         assertEquals(1L, next);
-        assertEquals(0.0, meterRegistry.counter("webhook_sequence_reseeded_total").count(),
-                "A genuinely new endpoint isn't a desync -- no reseed metric expected");
+        assertEquals(0.0, meterRegistry.counter("webhook_sequence_reseeded_total").count());
     }
 
     @Test
@@ -129,12 +115,11 @@ class SequenceGeneratorServiceTest {
         counter.incrementAndGet();
         counter.incrementAndGet();
         counter.incrementAndGet();
-        counter.incrementAndGet(); // key already at 5 -- normal hot path, no flush
+        counter.incrementAndGet();
 
         long next = service.nextSequence(endpointId);
 
         assertEquals(6L, next);
-        // No cache miss -- must not hit the DB at all on the hot path.
         verifyNoInteractions(deliveryRepository);
     }
 
@@ -147,16 +132,14 @@ class SequenceGeneratorServiceTest {
         int threadCount = 6;
         ExecutorService pool = Executors.newFixedThreadPool(threadCount);
         try {
-            List<Future<Long>> futures = new java.util.ArrayList<>();
+            List<Future<Long>> futures = new ArrayList<>();
             for (int i = 0; i < threadCount; i++) {
                 futures.add(pool.submit(() -> service.nextSequence(endpointId)));
             }
-            java.util.Set<Long> results = new java.util.HashSet<>();
+            Set<Long> results = new HashSet<>();
             for (Future<Long> f : futures) {
                 results.add(f.get(5, TimeUnit.SECONDS));
             }
-            // Exactly threadCount distinct values, all > the seed, with no duplicate/lost
-            // increments despite the concurrent reseed race.
             assertEquals(threadCount, results.size());
             assertTrue(results.stream().allMatch(v -> v > 50));
         } finally {
@@ -164,8 +147,6 @@ class SequenceGeneratorServiceTest {
             assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
         }
     }
-
-    // ── reseedIfBehind (used by the periodic reconciliation job) ────────
 
     @Test
     void reseedIfBehind_currentBelowMinimum_bumpsUp() {

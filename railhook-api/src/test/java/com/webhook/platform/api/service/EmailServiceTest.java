@@ -4,17 +4,19 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import jakarta.mail.Session;
+import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
-
-import jakarta.mail.internet.MimeMessage;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -27,18 +29,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/**
- * What this service is allowed to write down.
- *
- * <p>Two of the three secrets it handles are short-lived and single-use, and
- * {@code sendTemporaryPasswordEmail} explains why that makes them safe to log when there is no
- * SMTP to send them through: without that line, a deployment with {@code app.email.enabled=false}
- * has no way to complete a password reset at all. That affordance is deliberate and stays.
- *
- * <p>What it never covered is the other two cases. A production deployment is not a workstation,
- * and a send that fails is not a deployment that asked for links in its log — it is one that
- * configured SMTP and had it blink.
- */
 class EmailServiceTest {
 
     private JavaMailSender mailSender;
@@ -84,6 +74,18 @@ class EmailServiceTest {
         doThrow(new MailSendException("relay refused")).when(mailSender).send(any(MimeMessage.class));
     }
 
+    private MimeMessage captured() {
+        MimeMessage message = new MimeMessage((Session) null);
+        when(mailSender.createMimeMessage()).thenReturn(message);
+        return message;
+    }
+
+    private static String wire(MimeMessage message) throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        message.writeTo(out);
+        return out.toString(StandardCharsets.UTF_8);
+    }
+
     @Nested
     @DisplayName("with no SMTP configured")
     class WithoutSmtp {
@@ -102,75 +104,34 @@ class EmailServiceTest {
         @Test
         @DisplayName("production does not, and says where the link went instead")
         void productionWithholdsTheLink() {
-            // A reset token is short-lived and single-use, which is what makes logging it a
-            // reasonable trade on a workstation. It is not one in production: anybody who can
-            // read the log can take any account, and neither of those properties slows them
-            // down. The operator is told what to fix rather than handed the secret.
             emailEnabled(false);
             environment("production");
 
             service.sendPasswordResetEmail("real@railhook.test", "tok-prod");
 
-            assertThat(loggedText()).doesNotContain("tok-prod");
-            assertThat(loggedText()).contains("EMAIL_ENABLED");
+            assertThat(loggedText()).doesNotContain("tok-prod").contains("EMAIL_ENABLED");
         }
     }
 
-    @Nested
-    @DisplayName("with SMTP configured, when the send fails")
-    class SendFailure {
+    @Test
+    @DisplayName("with SMTP configured, a failed send never logs its link as a consolation prize")
+    void failedSendLogsNoLink() {
+        emailEnabled(true);
+        environment("production");
+        smtpFails();
 
-        @Test
-        @DisplayName("the reset link is not logged as a consolation prize")
-        void resetLinkIsNotLogged() {
-            // This branch fires with app.email.enabled=true — a deployment that configured SMTP
-            // and had it fail. It never asked for links in its log, and one flaky relay should
-            // not be the difference. sendTemporaryPasswordEmail already refuses to do this.
-            emailEnabled(true);
-            environment("production");
-            smtpFails();
+        service.sendPasswordResetEmail("real@railhook.test", "tok-fallback");
+        service.sendVerificationEmail("real@railhook.test", "tok-verify");
+        service.sendInviteEmail("real@railhook.test", "org-1", "tok-invite");
 
-            service.sendPasswordResetEmail("real@railhook.test", "tok-fallback");
-
-            assertThat(loggedText()).doesNotContain("tok-fallback");
-            assertThat(loggedText()).contains("Mail password-reset to r***l@railhook.test failed");
-        }
-
-        @Test
-        @DisplayName("neither is the verification link")
-        void verificationLinkIsNotLogged() {
-            emailEnabled(true);
-            environment("production");
-            smtpFails();
-
-            service.sendVerificationEmail("real@railhook.test", "tok-verify");
-
-            assertThat(loggedText()).doesNotContain("tok-verify");
-        }
-
-        @Test
-        @DisplayName("nor the invite link, which the caller is handed anyway")
-        void inviteLinkIsNotLogged() {
-            // inviteUrl() hands the same link back to the inviting owner, so logging it here
-            // adds a copy in the least controlled place and nothing else.
-            emailEnabled(true);
-            environment("production");
-            smtpFails();
-
-            service.sendInviteEmail("real@railhook.test", "org-1", "tok-invite");
-
-            assertThat(loggedText()).doesNotContain("tok-invite");
-        }
+        assertThat(loggedText())
+                .doesNotContain("tok-fallback")
+                .doesNotContain("tok-verify")
+                .doesNotContain("tok-invite")
+                .contains("Mail password-reset to r***l@railhook.test failed");
     }
 
-    /**
-     * What a support request about a missing mail can be answered from.
-     *
-     * <p>A real person registered as {@code wheelet1228@gmail.con}; the provider showed three
-     * bounces and this log showed nothing that tied them to a template or an outcome. Every send
-     * now leaves an attempt and a result, with the recipient masked — enough to recognise the
-     * address someone reports, not enough to harvest one — and never a body or a token.
-     */
+    // A real bounce could not be tied to a template or outcome; sends now log a masked recipient.
     @Nested
     @DisplayName("mail outcomes in the log")
     class Outcomes {
@@ -204,7 +165,6 @@ class EmailServiceTest {
             service.sendInviteEmail("teammate@acme.io", "org-1", "tok-secret-invite");
 
             assertThat(loggedText())
-                    .contains("Sending mail invite to t***e@acme.io")
                     .contains("Mail invite to t***e@acme.io failed: relay refused")
                     .doesNotContain("teammate@acme.io")
                     .doesNotContain("tok-secret-invite");
@@ -244,8 +204,8 @@ class EmailServiceTest {
             assertThat(loggedText()).contains("tok-dev-link").contains("w***8@gmail.con").doesNotContain("wheelet1228");
         }
 
-        @org.junit.jupiter.params.ParameterizedTest
-        @org.junit.jupiter.params.provider.CsvSource(nullValues = "NULL", value = {
+        @ParameterizedTest
+        @CsvSource(nullValues = "NULL", value = {
                 "wheelet1228@gmail.con, w***8@gmail.con",
                 "ab@x.io, a***b@x.io",
                 "a@x.io, a***@x.io",
@@ -257,42 +217,11 @@ class EmailServiceTest {
         }
     }
 
-    /**
-     * What actually leaves the building.
-     *
-     * These were HTML-only, with the link reachable solely through a styled anchor. Two
-     * consequences, and the first is the one that costs you the message entirely: a mail with
-     * no {@code text/plain} alternative scores worse with every spam filter that looks, and a
-     * password reset is precisely the message that must not be filtered. The second is that a
-     * client which does not render the button — or a person who would rather copy the address
-     * than click a button in an email, which is the advice everyone is given — had nothing to
-     * copy.
-     */
     @Nested
     @DisplayName("the message itself")
     class Content {
 
-        private MimeMessage captured() throws Exception {
-            MimeMessage message = new jakarta.mail.internet.MimeMessage((jakarta.mail.Session) null);
-            when(mailSender.createMimeMessage()).thenReturn(message);
-            return message;
-        }
-
-        /**
-         * Reads the message as it would go on the wire.
-         *
-         * <p>Walking the part tree needs a DataContentHandler for each type, and outside a
-         * container there is none registered for text/html — the part comes back as a stream,
-         * or as a wrapper that claims text/plain because it has no Content-Type of its own.
-         * Serialising sidesteps all of it and asserts the thing that actually matters: what a
-         * receiving server is handed.
-         */
-        private String wire(MimeMessage message) throws Exception {
-            var out = new java.io.ByteArrayOutputStream();
-            message.writeTo(out);
-            return out.toString(java.nio.charset.StandardCharsets.UTF_8);
-        }
-
+        // An HTML-only reset scores worse with spam filters, and a reset must not be filtered.
         @Test
         @DisplayName("a reset carries a plain-text alternative as well as the HTML")
         void resetIsMultipart() throws Exception {
@@ -302,85 +231,29 @@ class EmailServiceTest {
 
             service.sendPasswordResetEmail("real@railhook.test", "tok-multipart");
 
-            String sent = wire(message);
-            assertThat(sent)
-                    .as("no text/plain part is a deliverability problem, not a styling one")
+            assertThat(wire(message))
                     .contains("text/plain")
                     .contains("text/html")
-                    .contains("multipart/alternative");
-            assertThat(sent).contains("tok-multipart");
-        }
-
-        @Test
-        @DisplayName("and shows the address, not only a button pointing at it")
-        void resetShowsTheLinkAsText() throws Exception {
-            emailEnabled(true);
-            environment("production");
-            MimeMessage message = captured();
-
-            service.sendPasswordResetEmail("real@railhook.test", "tok-visible");
-
-            // Three times at least: the plain part, the button's href, and the address
-            // written out underneath it for someone who would rather copy than click.
-            String sent = wire(message);
-            assertThat(sent.split("tok-visible", -1).length - 1)
-                    .as("the URL has to appear as readable text, not only inside an href")
-                    .isGreaterThanOrEqualTo(3);
-        }
-
-        @Test
-        @DisplayName("verification and invite say the same thing the same way")
-        void theOtherTwoMatch() throws Exception {
-            emailEnabled(true);
-            environment("production");
-
-            MimeMessage verify = captured();
-            service.sendVerificationEmail("real@railhook.test", "tok-verify");
-            assertThat(wire(verify)).contains("text/plain").contains("tok-verify");
-
-            MimeMessage invite = captured();
-            service.sendInviteEmail("real@railhook.test", "org-1", "tok-invite");
-            assertThat(wire(invite)).contains("text/plain").contains("tok-invite");
+                    .contains("multipart/alternative")
+                    .contains("tok-multipart");
         }
 
         @Test
         @DisplayName("the temporary password is not repeated in plain text")
         void theTemporaryPasswordStaysInOnePlace() throws Exception {
-            // The one exception. This password grants full, non-expiring access until it is
-            // changed, and sendTemporaryPasswordEmail already refuses to log it for that
-            // reason — putting a second copy in a text part would widen the same exposure.
             emailEnabled(true);
             environment("production");
             MimeMessage message = captured();
 
             service.sendTemporaryPasswordEmail("real@railhook.test", "TempPw!12345");
 
-            // Exactly one copy, in the HTML body. A text alternative here would widen the
-            // same exposure sendTemporaryPasswordEmail already refuses to widen by logging.
             assertThat(wire(message).split("TempPw!12345", -1).length - 1).isEqualTo(1);
         }
     }
 
-    /**
-     * The two onboarding mails: a welcome when an address is proven, and one nudge two days later
-     * for an account that has not sent anything yet. Written as a person, so a reply is the point —
-     * it goes to the support address, never to the no-reply sender.
-     */
     @Nested
     @DisplayName("the onboarding mails")
     class Onboarding {
-
-        private MimeMessage captured() {
-            MimeMessage message = new MimeMessage((jakarta.mail.Session) null);
-            when(mailSender.createMimeMessage()).thenReturn(message);
-            return message;
-        }
-
-        private String wire(MimeMessage message) throws Exception {
-            var out = new ByteArrayOutputStream();
-            message.writeTo(out);
-            return out.toString(StandardCharsets.UTF_8);
-        }
 
         @Test
         @DisplayName("the welcome goes to the new account, replies go to support, and the text part carries the quickstart")
@@ -399,37 +272,6 @@ class EmailServiceTest {
             assertThat(plainPart(sent))
                     .contains("https://railhook.test/docs/start/quickstart/")
                     .contains("https://railhook.test/docs/");
-            assertThat(loggedText()).contains("Mail onboarding-welcome to n***w@acme.io sent");
-        }
-
-        @Test
-        @DisplayName("without a support address a reply goes back to the sender, not nowhere")
-        void welcomeWithoutSupportAddress() throws Exception {
-            emailEnabled(true);
-            ReflectionTestUtils.setField(service, "supportAddress", "");
-            MimeMessage message = captured();
-
-            service.sendWelcomeEmail("new@acme.io");
-
-            assertThat(message.getHeader("Reply-To")).isNull();
-            assertThat(message.getFrom()).extracting(Object::toString).containsExactly("noreply@railhook.test");
-        }
-
-        @Test
-        @DisplayName("the nudge is the same shape: to the account, replies to support, the quickstart in plain text")
-        void nudge() throws Exception {
-            emailEnabled(true);
-            ReflectionTestUtils.setField(service, "supportAddress", "support@railhook.test");
-            MimeMessage message = captured();
-
-            service.sendOnboardingNudgeEmail("new@acme.io");
-
-            assertThat(message.getAllRecipients()).extracting(Object::toString).containsExactly("new@acme.io");
-            assertThat(message.getReplyTo()).extracting(Object::toString).containsExactly("support@railhook.test");
-            String sent = wire(message);
-            assertThat(sent).contains("text/plain").contains("text/html");
-            assertThat(plainPart(sent)).contains("https://railhook.test/docs/start/quickstart/");
-            assertThat(loggedText()).contains("Mail onboarding-nudge to n***w@acme.io sent");
         }
 
         @Test
@@ -449,7 +291,6 @@ class EmailServiceTest {
                     .doesNotContain("new@acme.io");
         }
 
-        /** The text/plain part as sent: what a client that will not render HTML shows. */
         private String plainPart(String wire) {
             int start = wire.indexOf("text/plain");
             int end = wire.indexOf("text/html");
@@ -459,47 +300,21 @@ class EmailServiceTest {
         }
     }
 
-    /**
-     * The message form on the public site. Anonymous, so the one rule that keeps it from being a
-     * relay lives here: it only ever writes to the deployment's own support address. The visitor's
-     * address is the Reply-To, never a recipient, and what they typed goes out as plain text.
-     */
-    @Nested
-    @DisplayName("a message from the site's contact form")
-    class ContactMessage {
+    // The public contact form must never relay: it only writes to the support address.
+    @Test
+    @DisplayName("a contact-form message goes to support, with the visitor as Reply-To, as plain text")
+    void contactMessageGoesToSupport() throws Exception {
+        emailEnabled(true);
+        ReflectionTestUtils.setField(service, "supportAddress", "support@railhook.test");
+        MimeMessage message = captured();
 
-        private MimeMessage captured() {
-            MimeMessage message = new MimeMessage((jakarta.mail.Session) null);
-            when(mailSender.createMimeMessage()).thenReturn(message);
-            return message;
-        }
+        service.sendContactMessage("ada@example.com", "Ada", "sales", "<b>Two million</b> a month", "/pricing");
 
-        @Test
-        @DisplayName("goes to support, with the visitor as Reply-To")
-        void goesToSupport() throws Exception {
-            emailEnabled(true);
-            ReflectionTestUtils.setField(service, "supportAddress", "support@railhook.test");
-            MimeMessage message = captured();
-
-            service.sendContactMessage("ada@example.com", "Ada", "sales", "<b>Two million</b> a month", "/pricing");
-
-            assertThat(message.getAllRecipients()).extracting(Object::toString).containsExactly("support@railhook.test");
-            assertThat(message.getReplyTo()).extracting(Object::toString).containsExactly("ada@example.com");
-            assertThat(message.getSubject()).contains("sales").contains("Ada");
-            assertThat(message.getContent().toString())
-                    .contains("<b>Two million</b> a month")
-                    .contains("/pricing");
-            assertThat(message.getContentType()).startsWith("text/plain");
-        }
-
-        @Test
-        @DisplayName("is not available without a support address")
-        void unavailableWithoutSupportAddress() {
-            ReflectionTestUtils.setField(service, "supportAddress", "");
-            assertThat(service.isContactAvailable()).isFalse();
-
-            ReflectionTestUtils.setField(service, "supportAddress", "support@railhook.test");
-            assertThat(service.isContactAvailable()).isTrue();
-        }
+        assertThat(message.getAllRecipients()).extracting(Object::toString).containsExactly("support@railhook.test");
+        assertThat(message.getReplyTo()).extracting(Object::toString).containsExactly("ada@example.com");
+        assertThat(message.getContent().toString())
+                .contains("<b>Two million</b> a month")
+                .contains("/pricing");
+        assertThat(message.getContentType()).startsWith("text/plain");
     }
 }

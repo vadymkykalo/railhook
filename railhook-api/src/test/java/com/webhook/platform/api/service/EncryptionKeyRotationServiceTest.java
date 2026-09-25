@@ -34,6 +34,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -63,7 +64,7 @@ class EncryptionKeyRotationServiceTest {
         // TransactionTemplate that just executes the callback directly
         TransactionTemplate txTemplate = mock(TransactionTemplate.class);
         lenient().doAnswer(inv -> {
-            inv.<java.util.function.Consumer<TransactionStatus>>getArgument(0).accept(null);
+            inv.<Consumer<TransactionStatus>>getArgument(0).accept(null);
             return null;
         }).when(txTemplate).executeWithoutResult(any());
 

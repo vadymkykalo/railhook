@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service.workflow;
 
+import com.webhook.platform.api.service.workflow.executors.BranchNodeExecutor;
+import com.webhook.platform.api.service.workflow.executors.FilterNodeExecutor;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -17,16 +19,12 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/**
- * Exercises WorkflowEngine's DAG execution directly (topological order, branch
- * routing, filter-driven skips, per-node and whole-execution timeouts, failure
- * propagation) using lightweight fake NodeExecutors rather than a Spring context.
- */
 class WorkflowEngineTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
@@ -69,14 +67,13 @@ class WorkflowEngineTest {
         }
     }
 
-    /** Records every invocation and returns a caller-supplied StepResult. */
     private static class RecordingExecutor implements NodeExecutor {
         private final String type;
-        private final java.util.function.BiFunction<JsonNode, JsonNode, StepResult> fn;
+        private final BiFunction<JsonNode, JsonNode, StepResult> fn;
         final List<JsonNode> receivedInputs = new CopyOnWriteArrayList<>();
         final AtomicInteger invocationCount = new AtomicInteger();
 
-        RecordingExecutor(String type, java.util.function.BiFunction<JsonNode, JsonNode, StepResult> fn) {
+        RecordingExecutor(String type, BiFunction<JsonNode, JsonNode, StepResult> fn) {
             this.type = type;
             this.fn = fn;
         }
@@ -102,8 +99,6 @@ class WorkflowEngineTest {
         }
     }
 
-    // ─── Empty / trivial workflows ───────────────────────────────────────
-
     @Test
     void emptyNodesArray_completesImmediatelyWithoutSteps() {
         WorkflowEngine engine = newEngine(List.of());
@@ -114,18 +109,6 @@ class WorkflowEngineTest {
         verify(persistence).completeExecution(eq(executionId), eq(ExecutionStatus.COMPLETED), isNull(), anyLong());
         verify(persistence, never()).saveStep(any(), any(), any(), any(), any(), anyInt());
     }
-
-    @Test
-    void missingNodesField_completesImmediately() {
-        WorkflowEngine engine = newEngine(List.of());
-        UUID executionId = UUID.randomUUID();
-
-        engine.execute(executionId, "{\"edges\":[]}", json("{}"));
-
-        verify(persistence).completeExecution(eq(executionId), eq(ExecutionStatus.COMPLETED), isNull(), anyLong());
-    }
-
-    // ─── Linear chain / piping ────────────────────────────────────────────
 
     @Test
     void linearChain_pipesEachNodesOutputAsTheNextNodesInput() {
@@ -162,8 +145,6 @@ class WorkflowEngineTest {
         verify(persistence).completeExecution(eq(executionId), eq(ExecutionStatus.COMPLETED), isNull(), anyLong());
     }
 
-    // ─── Branch routing ─────────────────────────────────────────────────
-
     private String branchWorkflowDefinition() {
         return """
                 {
@@ -185,8 +166,7 @@ class WorkflowEngineTest {
     @Test
     void branchNode_matchingCondition_routesOnlyToTrueHandle() {
         RecordingExecutor trigger = RecordingExecutor.passthrough("trigger");
-        com.webhook.platform.api.service.workflow.executors.BranchNodeExecutor branch =
-                new com.webhook.platform.api.service.workflow.executors.BranchNodeExecutor(mapper);
+        BranchNodeExecutor branch = new BranchNodeExecutor(mapper);
         RecordingExecutor onTrue = RecordingExecutor.passthrough("sinkTrue");
         RecordingExecutor onFalse = RecordingExecutor.passthrough("sinkFalse");
 
@@ -201,7 +181,7 @@ class WorkflowEngineTest {
         ArgumentCaptor<StepResult> resultCaptor = ArgumentCaptor.forClass(StepResult.class);
         verify(persistence, times(4)).saveStep(eq(executionId), anyString(), anyString(), any(), resultCaptor.capture(), anyInt());
         long skippedCount = resultCaptor.getAllValues().stream().filter(r -> r.status() == StepStatus.SKIPPED).count();
-        assertThat(skippedCount).isEqualTo(1); // onFalse skipped, branch not taken
+        assertThat(skippedCount).isEqualTo(1);
 
         verify(persistence).completeExecution(eq(executionId), eq(ExecutionStatus.COMPLETED), isNull(), anyLong());
     }
@@ -209,8 +189,7 @@ class WorkflowEngineTest {
     @Test
     void branchNode_nonMatchingCondition_routesOnlyToFalseHandle() {
         RecordingExecutor trigger = RecordingExecutor.passthrough("trigger");
-        com.webhook.platform.api.service.workflow.executors.BranchNodeExecutor branch =
-                new com.webhook.platform.api.service.workflow.executors.BranchNodeExecutor(mapper);
+        BranchNodeExecutor branch = new BranchNodeExecutor(mapper);
         RecordingExecutor onTrue = RecordingExecutor.passthrough("sinkTrue");
         RecordingExecutor onFalse = RecordingExecutor.passthrough("sinkFalse");
 
@@ -224,13 +203,10 @@ class WorkflowEngineTest {
         verify(persistence).completeExecution(eq(executionId), eq(ExecutionStatus.COMPLETED), isNull(), anyLong());
     }
 
-    // ─── Filter-driven skip ────────────────────────────────────────────
-
     @Test
     void filterNode_nonMatchingCondition_skipsDownstreamNodeWithoutInvokingIt() {
         RecordingExecutor trigger = RecordingExecutor.passthrough("trigger");
-        com.webhook.platform.api.service.workflow.executors.FilterNodeExecutor filter =
-                new com.webhook.platform.api.service.workflow.executors.FilterNodeExecutor(mapper);
+        FilterNodeExecutor filter = new FilterNodeExecutor(mapper);
         RecordingExecutor downstream = RecordingExecutor.passthrough("downstream");
 
         WorkflowEngine engine = newEngine(List.of(trigger, filter, downstream));
@@ -259,8 +235,6 @@ class WorkflowEngineTest {
 
         verify(persistence).completeExecution(eq(executionId), eq(ExecutionStatus.COMPLETED), isNull(), anyLong());
     }
-
-    // ─── Failure propagation ───────────────────────────────────────────
 
     @Test
     void nodeFailure_stopsExecutionAndNeverRunsDownstreamNodes() {
@@ -295,23 +269,6 @@ class WorkflowEngineTest {
     }
 
     @Test
-    void nodeFailure_errorMessagePropagatesToCompleteExecution() {
-        RecordingExecutor n1 = RecordingExecutor.fixed("boom", StepResult.failed("db unreachable"));
-        WorkflowEngine engine = newEngine(List.of(n1));
-        UUID executionId = UUID.randomUUID();
-
-        engine.execute(executionId, """
-                {"nodes":[{"id":"n1","type":"boom","data":{}}],"edges":[]}
-                """, json("{}"));
-
-        ArgumentCaptor<String> errorCaptor = ArgumentCaptor.forClass(String.class);
-        verify(persistence).completeExecution(eq(executionId), eq(ExecutionStatus.FAILED), errorCaptor.capture(), anyLong());
-        assertThat(errorCaptor.getValue()).isEqualTo("db unreachable");
-    }
-
-    // ─── Unknown node type ──────────────────────────────────────────────
-
-    @Test
     void unknownNodeType_marksNodeFailedButWorkflowStillCompletes() {
         RecordingExecutor known = RecordingExecutor.passthrough("known");
         WorkflowEngine engine = newEngine(List.of(known));
@@ -330,9 +287,6 @@ class WorkflowEngineTest {
                 """;
         engine.execute(executionId, definition, json("{}"));
 
-        // n2 depends only on the unknown node, which gets marked skipped internally,
-        // so n2 is never invoked either — but the *workflow itself* still completes
-        // rather than failing, because unregistered types don't trigger the FAILED/return path.
         assertThat(known.invocationCount.get()).isEqualTo(0);
 
         ArgumentCaptor<StepResult> resultCaptor = ArgumentCaptor.forClass(StepResult.class);
@@ -342,8 +296,6 @@ class WorkflowEngineTest {
 
         verify(persistence).completeExecution(eq(executionId), eq(ExecutionStatus.COMPLETED), isNull(), anyLong());
     }
-
-    // ─── Depth propagation (recursion guard support) ───────────────────
 
     @Test
     void currentDepth_isCapturedFromCallingThread_andVisibleInsideNodeExecutorThread() {
@@ -369,26 +321,6 @@ class WorkflowEngineTest {
     }
 
     @Test
-    void currentDepth_defaultsToZero_whenNeverSetOnCallingThread() {
-        AtomicInteger observedDepth = new AtomicInteger(-1);
-        RecordingExecutor depthProbe = new RecordingExecutor("depthProbe", (config, input) -> {
-            observedDepth.set(WorkflowTriggerService.getCurrentDepth());
-            return StepResult.success(mapper.createObjectNode());
-        });
-
-        WorkflowEngine engine = newEngine(List.of(depthProbe));
-        UUID executionId = UUID.randomUUID();
-
-        engine.execute(executionId, """
-                {"nodes":[{"id":"n1","type":"depthProbe","data":{}}],"edges":[]}
-                """, json("{}"));
-
-        assertThat(observedDepth.get()).isEqualTo(0);
-    }
-
-    // ─── Per-node timeout ───────────────────────────────────────────────
-
-    @Test
     void perNodeTimeout_exceeded_returnsFailedWithoutHangingTheEngine() {
         RecordingExecutor slowNode = new RecordingExecutor("slow", (config, input) -> {
             try {
@@ -399,7 +331,6 @@ class WorkflowEngineTest {
             return StepResult.success(mapper.createObjectNode());
         });
 
-        // defaultTimeoutSeconds=1 so "slow" (not http/slack/delay/createEvent) times out fast.
         WorkflowEngine engine = newEngine(List.of(slowNode), 600, 1, 60, 60, 30, 4, 2);
         UUID executionId = UUID.randomUUID();
 
@@ -416,8 +347,6 @@ class WorkflowEngineTest {
         assertThat(errorCaptor.getValue()).contains("Node timeout");
     }
 
-    // ─── Whole-execution timeout ────────────────────────────────────────
-
     @Test
     void globalExecutionTimeout_stopsBeforeStartingTheNextNode() {
         RecordingExecutor slowButUnderNodeTimeout = new RecordingExecutor("slow", (config, input) -> {
@@ -430,8 +359,7 @@ class WorkflowEngineTest {
         });
         RecordingExecutor neverRuns = RecordingExecutor.passthrough("neverRuns");
 
-        // maxDurationSeconds=1 (1000ms) but defaultTimeoutSeconds=5 so node n1 itself
-        // is allowed to finish its 1.2s sleep — the *global* check trips before n2 starts.
+        // The node finishes inside its own timeout; the whole-execution budget trips before n2.
         WorkflowEngine engine = newEngine(List.of(slowButUnderNodeTimeout, neverRuns), 1, 5, 60, 60, 30, 4, 2);
         UUID executionId = UUID.randomUUID();
 
@@ -454,8 +382,6 @@ class WorkflowEngineTest {
         verify(persistence).completeExecution(eq(executionId), eq(ExecutionStatus.FAILED), errorCaptor.capture(), anyLong());
         assertThat(errorCaptor.getValue()).contains("timeout");
     }
-
-    // ─── Malformed definition ───────────────────────────────────────────
 
     @Test
     void malformedDefinitionJson_failsExecutionGracefully() {

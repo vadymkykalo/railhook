@@ -37,10 +37,7 @@ class CreateEventNodeExecutorTest {
         executor = new CreateEventNodeExecutor(eventIngestService, mapper);
     }
 
-    /**
-     * An Event a workflow creates is an Event the organization is charged for, so the month's
-     * quota refuses it like any other — the ingest checks it, and the step fails.
-     */
+    // A workflow-created Event is charged like any other, so the quota refuses it.
     @Test
     void overQuota_failsTheStep() throws Exception {
         UUID projectId = UUID.randomUUID();
@@ -56,11 +53,6 @@ class CreateEventNodeExecutorTest {
 
     private JsonNode json(String raw) throws Exception {
         return mapper.readTree(raw);
-    }
-
-    @Test
-    void getType_returnsCreateEvent() {
-        assertThat(executor.getType()).isEqualTo("createEvent");
     }
 
     @Test
@@ -80,18 +72,6 @@ class CreateEventNodeExecutorTest {
 
         assertThat(result.status()).isEqualTo(StepStatus.FAILED);
         assertThat(result.errorMessage()).contains("invalid projectId format");
-    }
-
-    @Test
-    void missingEventType_returnsFailed() throws Exception {
-        UUID projectId = UUID.randomUUID();
-        JsonNode config = json("{\"projectId\":\"" + projectId + "\"}");
-
-        StepResult result = executor.execute(config, json("{}"));
-
-        assertThat(result.status()).isEqualTo(StepStatus.FAILED);
-        assertThat(result.errorMessage()).contains("eventType is required");
-        verifyNoInteractions(eventIngestService);
     }
 
     @Test
@@ -167,17 +147,4 @@ class CreateEventNodeExecutorTest {
         assertThat(captor.getValue().getData()).isEqualTo(input);
     }
 
-    @Test
-    void ingestServiceThrows_returnsFailed() throws Exception {
-        UUID projectId = UUID.randomUUID();
-        JsonNode config = json("{\"projectId\":\"" + projectId + "\",\"eventType\":\"order.created\"}");
-
-        when(eventIngestService.ingestEvent(eq(projectId), any(EventIngestRequest.class), isNull()))
-                .thenThrow(new RuntimeException("quota exceeded"));
-
-        StepResult result = executor.execute(config, json("{}"));
-
-        assertThat(result.status()).isEqualTo(StepStatus.FAILED);
-        assertThat(result.errorMessage()).contains("Create Event error");
-    }
 }

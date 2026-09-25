@@ -12,13 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * The ceiling has to hold under contention, because contention is the only time it matters.
- *
- * <p>A project at its limit is a project whose next workflow waits — that is the whole mechanism
- * by which one tenant does not take the shared executor pool. Overshooting it is not a workflow
- * bug, it is the other tenants losing their turn, and it happens precisely when the pool is busy.
- */
+// Overshooting the ceiling takes other tenants' turn on the shared pool, exactly when it is busy.
 class ProjectConcurrencyLimiterTest {
 
     private static final int CEILING = 3;

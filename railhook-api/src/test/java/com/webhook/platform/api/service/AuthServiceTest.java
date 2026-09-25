@@ -81,20 +81,7 @@ class AuthServiceTest {
                 emailVerificationRequired);
     }
 
-    /**
-     * Reaching a second organization at all, and not reaching a third.
-     *
-     * <p>Login and refresh both took {@code findByUserIdOrderByCreatedAtAsc(...).findFirst()}, so
-     * the oldest membership won permanently: anyone who accepted an invite to a second organization
-     * had no way to look at it, and the {@code GET /api/v1/orgs} endpoint that listed both had no
-     * counterpart that could act on the answer. The organization now lives on the session, which is
-     * what makes the choice survive the next refresh fifteen minutes later.
-     *
-     * <p>Most of these tests are about what must <em>not</em> happen. The endpoint takes an
-     * organization as caller input — the only one in the API that does — so the interesting cases
-     * are the ones where the caller asks for something they are not entitled to, and the one where
-     * they are entitled but at a lower privilege than the token they currently hold.
-     */
+    // The oldest membership once won permanently; the organization now lives on the session.
     @Nested
     @MockitoSettings(strictness = Strictness.STRICT_STUBS)
     @DisplayName("AuthService.switchOrganization — a token for another organization you belong to")
@@ -166,9 +153,6 @@ class AuthServiceTest {
 
             AuthResponse response = authService.switchOrganization(userId, to(clientOrgId), refreshToken);
 
-            /* An OWNER of their own organization who is a VIEWER in a client's must arrive as a
-               VIEWER. Carrying the old role across would be a privilege escalation that looks like
-               a navigation action. */
             assertThat(realJwt.getRoleFromToken(response.getAccessToken())).isEqualTo(MembershipRole.VIEWER);
         }
 
@@ -196,13 +180,8 @@ class AuthServiceTest {
             suspended.setStatus(MembershipStatus.DISABLED);
             when(membershipRepository.findByUserIdAndOrganizationId(userId, clientOrgId))
                     .thenReturn(Optional.of(suspended));
-            // Lenient: reached only if the suspension is ignored and a token is about to be minted.
             lenient().when(userRepository.findById(userId)).thenReturn(Optional.of(user()));
 
-            /* Login and refresh both skip a DISABLED membership, so a member suspended by one
-               organization could still sign in through another one they belong to and switch
-               straight back into the one that suspended them. Same message as a non-member, so the
-               answer does not reveal that a suspended membership exists. */
             assertThatThrownBy(() -> authService.switchOrganization(userId, to(clientOrgId), refreshToken))
                     .isInstanceOf(ForbiddenException.class)
                     .hasMessage("You are not a member of that organization");
@@ -259,10 +238,6 @@ class AuthServiceTest {
             AuthResponse first = authService.switchOrganization(userId, to(clientOrgId), refreshToken);
             AuthResponse second = authService.switchOrganization(userId, to(clientOrgId), refreshToken);
 
-            /* A switcher is a thing people double-click. If it rotated the refresh token, the second
-               click would present a token the first had just blacklisted -- which the reuse detection
-               in refreshToken() reads as a stolen token family and answers by revoking every session
-               the user has. Idempotent instead. */
             assertThat(second.getRefreshToken()).isNull();
             assertThat(realJwt.getOrganizationIdFromToken(first.getAccessToken())).isEqualTo(clientOrgId);
             assertThat(realJwt.getOrganizationIdFromToken(second.getAccessToken())).isEqualTo(clientOrgId);
@@ -298,9 +273,6 @@ class AuthServiceTest {
             AuthResponse response = authService.refreshToken(
                     refreshToken, SessionOrigin.of(SessionClient.WEB, "a-browser", "198.51.100.4"));
 
-            /* This is the half that was actually broken. Before the session remembered, refresh went
-               back to findFirst() over the memberships and quietly returned the user to their oldest
-               organization a quarter of an hour after they chose another one. */
             assertThat(realJwt.getOrganizationIdFromToken(response.getAccessToken())).isEqualTo(clientOrgId);
             verify(membershipRepository, never()).findByUserIdOrderByCreatedAtAsc(any());
         }
@@ -333,9 +305,6 @@ class AuthServiceTest {
                     .thenReturn(Optional.empty());
             when(userRepository.findById(userId)).thenReturn(Optional.of(user()));
 
-            /* The shape a replayed token has. The Redis blacklist catches it while its entry lives;
-               the session row catches it afterwards too, which is the point of having the durable
-               half at all. */
             assertThatThrownBy(() -> authService.refreshToken(
                     refreshToken, SessionOrigin.of(SessionClient.WEB, "a-browser", "198.51.100.4")))
                     .isInstanceOf(ResponseStatusException.class)
@@ -354,24 +323,7 @@ class AuthServiceTest {
         }
     }
 
-    /**
-     * A password change has to end the sessions that the old password could have opened.
-     *
-     * <p>Access tokens are self-contained and valid until they expire — nothing consults the
-     * database on each request — so changing the password without revoking them leaves whoever
-     * holds one still signed in. In the case this most matters, recovering a compromised account,
-     * that is the attacker: they keep full access for the remainder of the access-token TTL while
-     * the owner believes they have just locked them out.</p>
-     *
-     * <p>The mechanism was already here — {@code TokenBlacklistService.revokeAllUserTokens} bumps
-     * a per-user epoch that {@code JwtAuthenticationFilter} checks — and was wired into
-     * refresh-token reuse detection, but not into either password path.</p>
-     *
-     * <p>It now goes through {@code UserSessionService.revokeAllSessions}, which bumps that same
-     * epoch <em>and</em> marks the {@code user_sessions} rows revoked. Both halves matter: the epoch
-     * is what stops the tokens, the rows are what stops the session list from still showing a device
-     * as live after its owner has just changed their password to get rid of it.</p>
-     */
+    // Access tokens outlive a password change unless the change revokes them.
     @Nested
     @MockitoSettings(strictness = Strictness.STRICT_STUBS)
     class PasswordChangeRevokesSessions {
@@ -397,7 +349,6 @@ class AuthServiceTest {
 
             authService.resetPassword(token, "brand-new-password");
 
-            // The whole point of a reset is that whoever had access before does not any more.
             verify(userSessionService).revokeAllSessions(user.getId());
         }
 
@@ -412,15 +363,7 @@ class AuthServiceTest {
         }
     }
 
-    /**
-     * An account whose last organization is gone — removed from the only one it was invited to, or
-     * that organization deleted — still has to be able to sign in.
-     *
-     * <p>Sign-in answered 404 "No organization membership found", for a password and for Google alike,
-     * and nothing ever gave the account an organization again. Registering again was refused because
-     * the address was taken, and erasing the account needs a session. The person was locked out for
-     * good. They now get an organization of their own, as a new account does.
-     */
+    // An account with no organization left was locked out for good.
     @Nested
     class SignInWithoutMembership {
 
@@ -445,7 +388,6 @@ class AuthServiceTest {
                     .emailVerified(true)
                     .build();
             when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
-            // What the repository holds: nothing, until the sign-in saves a membership.
             List<Membership> stored = new ArrayList<>();
             when(membershipRepository.findByUserIdOrderByCreatedAtAsc(user.getId()))
                     .thenAnswer(inv -> List.copyOf(stored));
@@ -496,19 +438,7 @@ class AuthServiceTest {
         }
     }
 
-    /**
-     * Where a suspension is actually refused.
-     *
-     * <p>Nothing re-reads a Membership on a request: {@code JwtAuthenticationFilter} takes the
-     * organization and the role straight off the access token. The one place a Membership becomes an
-     * authenticated context is where a token is minted from it — login and refresh — so that is where
-     * a suspended membership has to stop being a way in, rather than in a check added per endpoint.
-     * The live token is closed off separately, by the epoch revocation {@code suspendMember} does.</p>
-     *
-     * <p>A suspension is per organization, not per account, so a member suspended in one organization
-     * and active in another is still that other organization's member. The membership the token names
-     * has to skip the suspended one rather than the login being refused outright.</p>
-     */
+    // Login and refresh mint tokens from a Membership, so that is where suspension is refused.
     @Nested
     class SuspendedMembershipDeniesAccess {
 
@@ -542,8 +472,6 @@ class AuthServiceTest {
             when(jwtUtil.getExpirationFromToken(any())).thenReturn(Date.from(Instant.now().plusSeconds(3600)));
             when(tokenBlacklistService.isBlacklisted(any())).thenReturn(false);
             when(tokenBlacklistService.isTokenRevokedByEpoch(any(), any())).thenReturn(false);
-            // No session row: refreshToken then falls back to the oldest membership it may issue
-            // for, which is the path these tests are about.
             when(userSessionService.findByRefreshJti(any())).thenReturn(Optional.empty());
             when(jwtUtil.getSessionIdFromToken(any())).thenReturn(null);
             when(accountLockoutService.isLocked(any())).thenReturn(false);

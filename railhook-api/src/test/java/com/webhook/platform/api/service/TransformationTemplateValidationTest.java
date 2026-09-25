@@ -32,18 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-/**
- * A malformed JSONPath is caught where the person who can fix it is looking.
- *
- * <p>Validation checked that a template parsed as JSON and that each {@code ${...}} started with
- * a {@code $}. "{@code $} plus nonsense" passed both. It then failed at delivery time — once per
- * attempt, for every event, for as long as nobody noticed — and before the worker was taught to
- * fail loudly it did not even do that: {@code evaluateJsonPath} swallowed the error at DEBUG and
- * substituted a JSON null, so the receiver got a delivered, signed body with holes in it.
- *
- * <p>The author is the only person who can fix a typo in their own path, and saving the
- * transformation is the one moment they are looking at it.
- */
+// A bad JSONPath used to fail at delivery time, once per attempt, instead of on save.
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("TransformationService — a template's JSONPaths are compiled, not just prefix-checked")
@@ -93,8 +82,6 @@ class TransformationTemplateValidationTest {
     @Test
     @DisplayName("a filter expression is a valid path, not a syntax error")
     void filterExpressionIsAccepted() {
-        /* The prefix check would have passed this and so must the compiler: rejecting real
-           JSONPath to catch typos would be a worse trade than the bug being fixed. */
         assertThatCode(() -> service.create(projectId,
                 request("{\"first\":\"${$.items[?(@.active == true)].name}\"}"), null))
                 .doesNotThrowAnyException();
@@ -103,24 +90,16 @@ class TransformationTemplateValidationTest {
     @Test
     @DisplayName("a template full of unclosed ${ openers is rejected in linear time")
     void unclosedExpressionOpenersDoNotBacktrack() {
-        /* CodeQL java/polynomial-redos: `\$\{([^}]*)\}` rescans to the end of the template from
-           every `${` when no `}` follows, so a valid-JSON template of repeated "${{" took
-           quadratic time on save — a request anyone with write access could send. */
+        // The old regex rescanned to the end from every '${', quadratic on save.
         String template = "{\"a\":\"" + "${{".repeat(60_000) + "\"}";
         assertTimeoutPreemptively(Duration.ofSeconds(2), () -> {
             try {
                 service.create(projectId, request(template), null);
             } catch (IllegalArgumentException expected) {
-                // rejected or accepted is not the point; finishing promptly is
             }
         });
     }
 
-    /**
-     * Deleting a transformation still in use answers 409 with its message. It used to throw
-     * IllegalStateException, which the error handler treats as a server fault: a 500 that hides
-     * from the person what they need to do.
-     */
     @Test
     void deletingATransformationStillInUseIsAConflict() {
         UUID id = UUID.randomUUID();
@@ -140,10 +119,6 @@ class TransformationTemplateValidationTest {
         return r;
     }
 
-    /**
-     * The engine is built lazily inside itself, so a test that only ever validates templates
-     * never brings GraalJS up at all.
-     */
     private static JavaScriptTransformEngine scriptEngine() {
         return new JavaScriptTransformEngine(new ObjectMapper(), ScriptLimits.defaults());
     }

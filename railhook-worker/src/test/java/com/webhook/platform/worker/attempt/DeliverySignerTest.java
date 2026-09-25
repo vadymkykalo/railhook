@@ -5,6 +5,8 @@ import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.worker.domain.entity.Endpoint;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -28,28 +30,16 @@ class DeliverySignerTest {
     @Mock
     private EncryptionKeyRegistry encryptionKeyRegistry;
 
-    @Test
-    void insideTheGraceWindowBothSecretsSign() {
+    @ParameterizedTest
+    @CsvSource({
+            "2026-01-01T23:59:59Z, 2",
+            "2026-01-02T00:00:00Z, 2",
+            "2026-01-02T00:00:01Z, 1"
+    })
+    void bothSecretsSignOnlyInsideTheInclusiveGraceWindow(String instant, int signatures) {
         bothSecretsDecrypt();
 
-        String header = signAt("2026-01-01T23:59:59Z").legacy();
-
-        assertThat(header.split("v1=", -1)).as("one signature per live secret").hasSize(3);
-    }
-
-    /** The window is inclusive of its own boundary: erring toward one extra signature is harmless. */
-    @Test
-    void theBoundaryInstantIsStillInside() {
-        bothSecretsDecrypt();
-
-        assertThat(signAt("2026-01-02T00:00:00Z").legacy().split("v1=", -1)).hasSize(3);
-    }
-
-    @Test
-    void pastTheWindowOnlyTheCurrentSecretSigns() {
-        bothSecretsDecrypt();
-
-        assertThat(signAt("2026-01-02T00:00:01Z").legacy().split("v1=", -1)).hasSize(2);
+        assertThat(signAt(instant).legacy().split("v1=", -1)).hasSize(signatures + 1);
     }
 
     @Test

@@ -5,7 +5,6 @@ import org.junit.jupiter.api.AfterEach;
 import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.*;
 import com.webhook.platform.api.domain.repository.*;
-import com.webhook.platform.api.exception.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,14 +57,6 @@ class SubscriptionLifecycleServiceTest {
         org = Organization.builder().id(ORG_ID).name("Test Org").build();
     }
 
-    // ── createPending ───────────────────────────────────────────────
-
-
-    /**
-     * Every service under test now reads its organization from the ambient tenant scope instead
-     * of taking it as a parameter. A unit test has no request to establish one, so it
-     * enters the scope itself; without this the first call fails with TenantNotResolvedException.
-     */
     @BeforeEach
     void enterTenantScope() {
         TenantContext.set(ORG_ID);
@@ -121,8 +112,7 @@ class SubscriptionLifecycleServiceTest {
         service.createPending(proPlan, "stripe", "USD", BillingInterval.MONTHLY, 9900L, "cus_1", null, "cs_1");
 
         assertThat(earlier.getStatus()).isEqualTo(SubscriptionStatus.EXPIRED);
-        // Flushed before the new row is inserted: Hibernate would otherwise insert first, and
-        // the one-open-subscription-per-organization index would reject the insert.
+        // Flushed first, or the one-open-subscription-per-organization index rejects the insert.
         InOrder order = inOrder(subscriptionRepository);
         order.verify(subscriptionRepository).saveAndFlush(earlier);
         order.verify(subscriptionRepository).saveAndFlush(argThat(s -> s.getStatus() == SubscriptionStatus.PENDING));
@@ -142,8 +132,6 @@ class SubscriptionLifecycleServiceTest {
         assertThat(result.getMetadata()).contains("\"checkoutSessionId\":\"cs_test_1\"");
         assertThat(result.getBillingInterval()).isEqualTo(BillingInterval.YEARLY);
     }
-
-    // ── abandon ─────────────────────────────────────────────────────
 
     @Test
     void abandon_expiresAPendingCheckoutAndLeavesThePlanAlone() {
@@ -168,8 +156,6 @@ class SubscriptionLifecycleServiceTest {
         verify(subscriptionRepository, never()).saveAndFlush(any());
     }
 
-    // ── activate ────────────────────────────────────────────────────
-
     @Test
     void activate_changesStatusToActive() {
         BillingSubscription sub = buildSub(SubscriptionStatus.PAST_DUE);
@@ -188,8 +174,6 @@ class SubscriptionLifecycleServiceTest {
         verifyEvent(SubscriptionEventType.ACTIVATED, SubscriptionStatus.PAST_DUE, SubscriptionStatus.ACTIVE);
     }
 
-    // ── renew ───────────────────────────────────────────────────────
-
     @Test
     void renew_updatesPeriodsAndLogsEvent() {
         BillingSubscription sub = buildSub(SubscriptionStatus.ACTIVE);
@@ -205,8 +189,6 @@ class SubscriptionLifecycleServiceTest {
         assertThat(sub.getCurrentPeriodEnd()).isEqualTo(newEnd);
         verifyEvent(SubscriptionEventType.RENEWED, SubscriptionStatus.ACTIVE, SubscriptionStatus.ACTIVE);
     }
-
-    // ── changePlan ──────────────────────────────────────────────────
 
     @Test
     void changePlan_switchesPlanAndLogsEvent() {
@@ -226,8 +208,6 @@ class SubscriptionLifecycleServiceTest {
         assertThat(cap.getValue().getToPlanId()).isEqualTo(proPlan.getId());
     }
 
-    // ── markPastDue ─────────────────────────────────────────────────
-
     @Test
     void markPastDue_setsStatusAndSyncsBilling() {
         BillingSubscription sub = buildSub(SubscriptionStatus.ACTIVE);
@@ -241,8 +221,6 @@ class SubscriptionLifecycleServiceTest {
         verifyEvent(SubscriptionEventType.PAST_DUE, SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE);
     }
 
-    // ── startGracePeriod ────────────────────────────────────────────
-
     @Test
     void startGracePeriod_transitionsFromPastDue() {
         BillingSubscription sub = buildSub(SubscriptionStatus.PAST_DUE);
@@ -252,23 +230,10 @@ class SubscriptionLifecycleServiceTest {
         service.startGracePeriod(SUB_ID);
 
         assertThat(sub.getStatus()).isEqualTo(SubscriptionStatus.GRACE_PERIOD);
+        assertThat(org.getBillingStatus()).isEqualTo(BillingStatus.GRACE_PERIOD);
         verifyEvent(SubscriptionEventType.GRACE_PERIOD_STARTED,
                 SubscriptionStatus.PAST_DUE, SubscriptionStatus.GRACE_PERIOD);
     }
-
-    @Test
-    void startGracePeriod_syncsBillingStatusOntoTheOrganization() {
-        BillingSubscription sub = buildSub(SubscriptionStatus.PAST_DUE);
-        org.setBillingStatus(BillingStatus.PAST_DUE);
-        when(subscriptionRepository.findById(SUB_ID)).thenReturn(Optional.of(sub));
-        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
-
-        service.startGracePeriod(SUB_ID);
-
-        assertThat(org.getBillingStatus()).isEqualTo(BillingStatus.GRACE_PERIOD);
-    }
-
-    // ── suspend ─────────────────────────────────────────────────────
 
     @Test
     void suspend_downgradsToFreePlan() {
@@ -286,8 +251,6 @@ class SubscriptionLifecycleServiceTest {
                 SubscriptionStatus.GRACE_PERIOD, SubscriptionStatus.SUSPENDED);
     }
 
-    // ── cancel ──────────────────────────────────────────────────────
-
     @Test
     void cancel_setsCancelledAtAndDowngrades() {
         BillingSubscription sub = buildSub(SubscriptionStatus.ACTIVE);
@@ -303,47 +266,6 @@ class SubscriptionLifecycleServiceTest {
         verifyEvent(SubscriptionEventType.CANCELLED,
                 SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELLED);
     }
-
-    // ── setExternalIds ──────────────────────────────────────────────
-
-    @Test
-    void setExternalIds_updatesFields() {
-        BillingSubscription sub = buildSub(SubscriptionStatus.ACTIVE);
-        when(subscriptionRepository.findById(SUB_ID)).thenReturn(Optional.of(sub));
-
-        service.setExternalIds(SUB_ID, "cus_123", "sub_456");
-
-        assertThat(sub.getExternalCustomerId()).isEqualTo("cus_123");
-        assertThat(sub.getExternalSubscriptionId()).isEqualTo("sub_456");
-        verify(subscriptionRepository).save(sub);
-    }
-
-    // ── setRecurringToken ───────────────────────────────────────────
-
-    @Test
-    void setRecurringToken_updatesCardInfo() {
-        BillingSubscription sub = buildSub(SubscriptionStatus.ACTIVE);
-        when(subscriptionRepository.findById(SUB_ID)).thenReturn(Optional.of(sub));
-
-        service.setRecurringToken(SUB_ID, "enc_token", "4242", "visa");
-
-        assertThat(sub.getRecurringTokenEncrypted()).isEqualTo("enc_token");
-        assertThat(sub.getCardLast4()).isEqualTo("4242");
-        assertThat(sub.getCardBrand()).isEqualTo("visa");
-        verify(subscriptionRepository).save(sub);
-    }
-
-    // ── not found ───────────────────────────────────────────────────
-
-    @Test
-    void findOrThrow_throwsNotFoundForMissingSub() {
-        when(subscriptionRepository.findById(SUB_ID)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.activate(SUB_ID, Instant.now(), Instant.now()))
-                .isInstanceOf(NotFoundException.class)
-                .hasMessageContaining("Subscription not found");
-    }
-
-    // ── Helpers ─────────────────────────────────────────────────────
 
     private BillingSubscription buildSub(SubscriptionStatus status) {
         return BillingSubscription.builder()

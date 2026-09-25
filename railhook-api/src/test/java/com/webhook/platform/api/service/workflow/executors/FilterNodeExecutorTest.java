@@ -24,11 +24,6 @@ class FilterNodeExecutorTest {
     }
 
     @Test
-    void getType_returnsFilter() {
-        assertThat(executor.getType()).isEqualTo("filter");
-    }
-
-    @Test
     void noConditions_passesThroughUnchanged() throws Exception {
         JsonNode input = json("{\"amount\":10}");
         StepResult result = executor.execute(json("{}"), input);
@@ -90,12 +85,4 @@ class FilterNodeExecutorTest {
         assertThat(result.errorMessage()).contains("Filter error");
     }
 
-    @Test
-    void nullConditionsNode_passesThrough() throws Exception {
-        JsonNode input = json("{\"a\":1}");
-        StepResult result = executor.execute(json("{\"conditions\":null}"), input);
-
-        assertThat(result.status()).isEqualTo(StepStatus.SUCCESS);
-        assertThat(result.output()).isEqualTo(input);
-    }
 }

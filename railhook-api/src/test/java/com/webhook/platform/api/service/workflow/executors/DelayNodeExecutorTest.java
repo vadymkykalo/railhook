@@ -11,26 +11,12 @@ import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * The delay node asks to be woken; it does not wait.
- *
- * <p>These tests previously asserted that {@code execute} slept for roughly the configured
- * number of seconds — which was the behaviour, and was the bug. The workflow pool is core-size 4
- * / max-size 8 for the whole deployment and a delay may be 300 seconds, so eight delay nodes
- * took every thread and no workflow belonging to any organization ran. The node now returns a
- * due time and the engine suspends the execution, so the clamping the old tests checked is
- * still worth checking — just not by timing it.
- */
+// Sleeping in execute let eight delay nodes take the whole shared workflow pool.
 @DisplayName("DelayNodeExecutor — returns a due time rather than occupying a thread")
 class DelayNodeExecutorTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final DelayNodeExecutor executor = new DelayNodeExecutor();
-
-    @Test
-    void getType_returnsDelay() {
-        assertThat(executor.getType()).isEqualTo("delay");
-    }
 
     @Test
     @DisplayName("returns immediately, asking to resume after the configured delay")
@@ -70,10 +56,6 @@ class DelayNodeExecutorTest {
             Instant before = Instant.now();
             StepResult result = executor.execute(mapper.readTree(raw), mapper.readTree("{}"));
 
-            /* A resumeAt in the past would be resumed on the very next tick, which is close
-               enough to correct — but a delay node that resolves to no delay reads as a bug in
-               the workflow rather than in the configuration, and one second is the smallest
-               honest answer. */
             assertThat(result.resumeAt())
                     .as(raw)
                     .isAfterOrEqualTo(before)

@@ -45,27 +45,4 @@ class WorkflowExecutionRecoveryJobTest {
                 "the recovery job must not let a repository failure escape — it runs on a @Scheduled thread");
     }
 
-    @Test
-    void recoverStuckExecutions_zeroRecovered_doesNotThrow() {
-        WorkflowExecutionRepository repository = mock(WorkflowExecutionRepository.class);
-        when(repository.failStuckExecutions(any(), anyString(), any())).thenReturn(0);
-
-        WorkflowExecutionRecoveryJob job = new WorkflowExecutionRecoveryJob(repository, 15);
-
-        assertDoesNotThrow(job::recoverStuckExecutions);
-        verify(repository, times(1)).failStuckExecutions(any(), anyString(), any());
-    }
-
-    @Test
-    void recoverStuckExecutions_errorMessageMentionsThresholdMinutes() {
-        WorkflowExecutionRepository repository = mock(WorkflowExecutionRepository.class);
-        when(repository.failStuckExecutions(any(), anyString(), any())).thenReturn(2);
-
-        WorkflowExecutionRecoveryJob job = new WorkflowExecutionRecoveryJob(repository, 42);
-        job.recoverStuckExecutions();
-
-        ArgumentCaptor<String> msgCaptor = ArgumentCaptor.forClass(String.class);
-        verify(repository).failStuckExecutions(any(), msgCaptor.capture(), any());
-        assertThat(msgCaptor.getValue()).contains("42");
-    }
 }

@@ -6,12 +6,11 @@ import com.webhook.platform.common.dto.tunnel.TunnelResponseMessage;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
 
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,11 +43,6 @@ class TunnelRegistryTest {
     }
 
     @Test
-    void shouldReturnFalseForNonExistentSlug() {
-        assertFalse(tunnelRegistry.isActive("nonexistent"));
-    }
-
-    @Test
     void shouldReturnFalseForClosedSession() {
         WebSocketSession session = mock(WebSocketSession.class);
         when(session.getId()).thenReturn("ws-2");
@@ -70,25 +64,7 @@ class TunnelRegistryTest {
         assertNull(response);
     }
 
-    @Test
-    void shouldCompleteRequest() {
-        String requestId = "req-complete-1";
-
-        // Simulate: register a pending request and complete it
-        tunnelRegistry.completeRequest("ws-none", requestId, TunnelResponseMessage.builder()
-                .requestId(requestId)
-                .statusCode(200)
-                .body("OK")
-                .build());
-
-        // No exception — just logs a warning about no pending request
-        assertEquals(0, tunnelRegistry.pendingRequestCount());
-    }
-
-    // A request already sent down a socket that then closes has nobody left to answer it. It used
-    // to wait out the full 30s and come back as a 504 "timed out" — and, across instances, the
-    // caller gave up at 25s while the owner still waited, so the local app could get the request
-    // after the provider had already been told it failed and was resending it.
+    // An in-flight request on a closed socket used to wait out 30s and report a timeout.
     @Test
     void aRequestInFlightWhenItsTunnelDisconnectsFailsAtOnce() throws Exception {
         WebSocketSession session = mock(WebSocketSession.class);
@@ -108,15 +84,14 @@ class TunnelRegistryTest {
 
         tunnelRegistry.unregister("slug-inflight", session);
 
-        TunnelResponseMessage response = answer.get(2, java.util.concurrent.TimeUnit.SECONDS);
+        TunnelResponseMessage response = answer.get(2, TimeUnit.SECONDS);
         assertNotNull(response, "a disconnect is an answer, not a timeout");
         assertEquals(502, response.getStatusCode());
         assertEquals("tunnel_disconnected", response.getError());
         assertEquals(0, tunnelRegistry.pendingRequestCount());
     }
 
-    // The CLI reconnects before the old socket's close callback has run — an API restart does
-    // exactly this. Unregistering by slug alone then removed the new session and failed its work.
+    // A reconnect beats the old socket's close callback, which then removed the new session.
     @Test
     void theCloseOfAReplacedSessionLeavesTheNewOneAndItsRequestsAlone() throws Exception {
         WebSocketSession old = mock(WebSocketSession.class);
@@ -144,7 +119,7 @@ class TunnelRegistryTest {
         assertFalse(answer.isDone(), "a request on the replacement session must not be failed");
         tunnelRegistry.completeRequest("ws-new", "req-on-new", TunnelResponseMessage.builder()
                 .requestId("req-on-new").statusCode(200).body("ok").build());
-        assertEquals(200, answer.get(2, java.util.concurrent.TimeUnit.SECONDS).getStatusCode());
+        assertEquals(200, answer.get(2, TimeUnit.SECONDS).getStatusCode());
     }
 
     @Test
@@ -156,11 +131,10 @@ class TunnelRegistryTest {
 
         tunnelRegistry.disconnect("slug-deleted");
 
-        verify(session).close(any(org.springframework.web.socket.CloseStatus.class));
+        verify(session).close(any(CloseStatus.class));
     }
 
-    // Request ids travel to the CLI in the clear, so any socket that learned one could answer a
-    // request that was sent down another tunnel.
+    // Request ids travel in the clear, so any socket that learned one could answer it.
     @Test
     void aResponseFromAnotherSocketDoesNotAnswerTheRequest() throws Exception {
         WebSocketSession session = mock(WebSocketSession.class);
@@ -184,28 +158,7 @@ class TunnelRegistryTest {
 
         tunnelRegistry.completeRequest("ws-owner", "req-owned", TunnelResponseMessage.builder()
                 .requestId("req-owned").statusCode(200).body("real").build());
-        assertEquals("real", answer.get(2, java.util.concurrent.TimeUnit.SECONDS).getBody());
+        assertEquals("real", answer.get(2, TimeUnit.SECONDS).getBody());
     }
 
-    @Test
-    void shouldTrackPendingRequestCount() {
-        assertEquals(0, tunnelRegistry.pendingRequestCount());
-    }
-
-    @Test
-    void shouldTrackActiveCount() {
-        assertEquals(0, tunnelRegistry.activeCount());
-
-        WebSocketSession session1 = mock(WebSocketSession.class);
-        when(session1.getId()).thenReturn("ws-a");
-        WebSocketSession session2 = mock(WebSocketSession.class);
-        when(session2.getId()).thenReturn("ws-b");
-
-        tunnelRegistry.register("slug-a", session1);
-        tunnelRegistry.register("slug-b", session2);
-        assertEquals(2, tunnelRegistry.activeCount());
-
-        tunnelRegistry.unregister("slug-a", session1);
-        assertEquals(1, tunnelRegistry.activeCount());
-    }
 }

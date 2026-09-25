@@ -24,24 +24,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
-/**
- * A share token must not cross a project boundary just because the caller asked nicely.
- *
- * <p>{@code listLinksForEvent} validated the {@code projectId} in the path and then loaded
- * links by {@code eventId} alone, never checking that the event belonged to that project —
- * unlike {@code createLink}, which does check. The response carries the raw token and the
- * share URL.</p>
- *
- * <p>That defeats the one control built for a leaked API key.
- * {@code ScopeEnforcementInterceptor.enforceProjectScope} confines a key to the
- * {@code {projectId}} in the URI template and says nothing about {@code {eventId}}, so a key
- * scoped to project A could name any event of project B, collect the token, and read that
- * event's payload through the unauthenticated {@code /public/debug/{token}} endpoint.</p>
- *
- * <p>The {@code @TenantId} on the entity keeps this inside one organization, so it is not a
- * cross-tenant leak — it is the project confinement failing, which is precisely the control
- * that is supposed to hold when a key has already been compromised.</p>
- */
+// listLinksForEvent loaded links by eventId alone, handing a project-scoped key another project's token.
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class SharedDebugLinkScopeTest {
@@ -90,7 +73,6 @@ class SharedDebugLinkScopeTest {
                 .build();
         when(linkRepository.findByEventId(foreignEventId)).thenReturn(List.of(foreign));
 
-        // Asking project A for the links of an event that lives in project B.
         assertTrue(service.listLinksForEvent(projectA, foreignEventId).isEmpty(),
                 "a caller confined to one project must not receive another project's share token");
     }

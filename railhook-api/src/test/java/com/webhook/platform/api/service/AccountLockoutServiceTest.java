@@ -37,14 +37,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * The bound on how many passwords may be guessed against one account.
- *
- * <p>These pin the four properties that make the lockout worth having without making it a
- * weapon: it counts only consecutive recent failures, it never fires on a correct password, it
- * always lapses on its own, and a password reset lifts it immediately. See
- * {@link AccountLockoutService} for the reasoning behind each.
- */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AccountLockoutService — progressive lockout with a self-service way out")
 class AccountLockoutServiceTest {
@@ -116,9 +108,6 @@ class AccountLockoutServiceTest {
         assertThat(second).isGreaterThan(first);
         assertThat(second).isBetween(Duration.ofSeconds(110), Duration.ofSeconds(120));
 
-        /* Far past any plausible number of typos: the cap, not an ever-growing wait. A lockout
-           that keeps growing is a permanent lockout with extra steps, and a permanent lockout
-           against a known email address is a denial of service. */
         for (int i = 0; i < 40; i++) {
             service.recordFailure(user);
         }
@@ -219,21 +208,7 @@ class AccountLockoutServiceTest {
                 .hasMessageContaining("AUTH_LOCKOUT_MAX_SECONDS");
     }
 
-    /**
-     * Where the lockout meets the login.
-     *
-     * <p>The tests above cover the counting; these cover the three decisions the
-     * login path makes with it, each of which would be a plausible thing to get wrong:
-     *
-     * <ul>
-     *   <li>the lock is checked <em>before</em> the password, so an attack cannot make the server
-     *       spend a deliberately-expensive BCrypt hash on every one of its attempts;</li>
-     *   <li>a correct password clears the count, so an account in daily use never drifts into a
-     *       lockout;</li>
-     *   <li>a locked account is refused even when the password presented is correct — otherwise the
-     *       lockout stops exactly the attacker who has already won.</li>
-     * </ul>
-     */
+    // The lock is checked before BCrypt, and refuses even a correct password while it holds.
     @Nested
     @DisplayName("AuthService.login — what the lockout does to a sign-in")
     class LoginLockout {
@@ -317,8 +292,6 @@ class AccountLockoutServiceTest {
                 assertThatThrownBy(() -> authService.login(attempt("wrong"), ORIGIN)).isNotNull();
             }
 
-            /* Letting a correct password through during the window would exempt precisely the
-               attacker whose guessing just succeeded, which is the one case the lockout is for. */
             assertThatThrownBy(() -> authService.login(attempt(PASSWORD), ORIGIN))
                     .isInstanceOf(ResponseStatusException.class)
                     .extracting(e -> ((ResponseStatusException) e).getStatusCode())
@@ -337,9 +310,6 @@ class AccountLockoutServiceTest {
 
             assertThatThrownBy(() -> authService.login(attempt("wrong"), ORIGIN)).isNotNull();
 
-            /* If the password were verified before the lock check, the attempt would also have been
-               counted -- and every attempt in a sustained attack would still cost a full BCrypt hash,
-               turning the lockout into a way to spend the server's CPU rather than save it. */
             assertThat(user.getFailedLoginAttempts()).isEqualTo(attemptsAfterLocking);
         }
 

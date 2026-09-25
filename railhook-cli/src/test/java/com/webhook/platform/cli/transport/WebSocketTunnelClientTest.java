@@ -33,8 +33,7 @@ class WebSocketTunnelClientTest {
         assertNull(sent.getError());
     }
 
-    // The server closes the socket over a message beyond its limit, which ended the whole tunnel;
-    // one oversized local response now fails that one request instead.
+    // An over-limit message made the server close the socket and end the whole tunnel.
     @Test
     void aResponseTooLargeForTheServerBecomesA502() throws Exception {
         byte[] large = new byte[600 * 1024];

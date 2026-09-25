@@ -4,14 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Covers the one thing left in RetryPolicy: the deferral backoff, used when an Attempt is
- * turned away by a rate limit, a concurrency cap or an open circuit breaker.
- *
- * <p>The ladder's arithmetic is {@code RetryLadderTest}'s, and which statuses are worth another
- * Attempt is {@code RetryableStatusesTest}'s — both in the common module, because both are now
- * carried by the obligation rather than decided here.
- */
+/** The deferral backoff for an Attempt turned away by a rate limit, concurrency cap or open breaker. */
 class RetryPolicyTest {
 
     @Test
@@ -32,8 +25,6 @@ class RetryPolicyTest {
 
     @Test
     void backoffWithJitter_neverExceedsMaxByMoreThanJitterMargin() {
-        // At high attempt counts the exponential term saturates the cap; the returned
-        // value can exceed maxSeconds by up to 25% due to jitter, but never more.
         long maxSeconds = 60;
         for (int i = 0; i < 100; i++) {
             long actual = RetryPolicy.backoffWithJitter(20, 2, maxSeconds);

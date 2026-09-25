@@ -14,12 +14,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-/**
- * What the retention job exports before it has deleted anything.
- *
- * <p>The cleanup counters were registered on their first increment, so a deployment whose
- * retention had nothing to do yet had no series and "Cleanup Deleted" read "No data" instead of 0.
- */
+// Counters registered on first increment left "Cleanup Deleted" reading "No data" instead of 0.
 class DataRetentionMetricsTest {
 
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
@@ -41,10 +36,7 @@ class DataRetentionMetricsTest {
         assertThat(registry.get("events_cleanup_total").counter().count()).isZero();
     }
 
-    /**
-     * A gauge named {@code *_total} is exported without the suffix — Prometheus reserves it for
-     * counters — so the dashboard asking for the name the code used found nothing.
-     */
+    // Prometheus strips _total from a gauge, so the dashboard found nothing under the old name.
     @Test
     void theStoredAttemptsGaugeCarriesTheNamePrometheusExports() {
         assertThat(registry.find("delivery_attempts_total").gauge()).isNull();

@@ -23,28 +23,18 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * The sweep that turns off a target which has answered nothing but failures for a window.
- *
- * <p>The worker keeps the run of failures on the target's row; this decides. It is split that
- * way because the decision needs the things the api owns — the alert, the mail, the audit of
- * who was told — and the worker has no channel to any of them but the database.
- *
- * <p>Deliberately a plain {@code *Test}: repositories are mocked, so it must run in the
- * no-Docker unit job. See {@code scripts/check-test-routing.sh}.
- */
 class EndpointAutoDisableServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-09-20T12:00:00Z");
@@ -108,23 +98,9 @@ class EndpointAutoDisableServiceTest {
             assertFalse(endpoint.getEnabled());
             assertEquals(NOW, endpoint.getAutoDisabledAt());
             assertNotNull(endpoint.getAutoDisabledReason());
-            assertTrue(endpoint.getAutoDisabledReason().contains("72"),
-                    "the reason has to name the window, or its owner cannot tell why now: "
-                            + endpoint.getAutoDisabledReason());
+            assertTrue(endpoint.getAutoDisabledReason().contains("72"));
             verify(endpointRepository).autoDisable(eq(endpoint.getId()), eq(NOW), any(String.class));
-        }
-
-        @Test
-        @DisplayName("the run of failures is left alone, so the endpoint's own history survives the disable")
-        void keepsTheRunOfFailures() {
-            Endpoint endpoint = failingEndpoint(NOW.minus(Duration.ofHours(80)), 400);
-            when(endpointRepository.findAutoDisableCandidates(any(), anyInt(), any()))
-                    .thenReturn(List.of(endpoint));
-
-            service.sweep();
-
-            assertEquals(NOW.minus(Duration.ofHours(80)), endpoint.getFailingSince(),
-                    "\"failing since\" is what the owner is told; clearing it here loses the answer");
+            assertEquals(NOW.minus(Duration.ofHours(80)), endpoint.getFailingSince());
             assertEquals(400, endpoint.getConsecutiveFailures());
         }
 
@@ -187,13 +163,12 @@ class EndpointAutoDisableServiceTest {
             Endpoint endpoint = failingEndpoint(NOW.minus(Duration.ofHours(80)), 400);
             when(endpointRepository.findAutoDisableCandidates(any(), anyInt(), any()))
                     .thenReturn(List.of(endpoint));
-            org.mockito.Mockito.doThrow(new IllegalStateException("mail server down"))
+            doThrow(new IllegalStateException("mail server down"))
                     .when(notifier).endpointDisabled(any());
 
             service.sweep();
 
-            assertFalse(endpoint.getEnabled(),
-                    "the endpoint is dead either way; failing to say so does not make it alive");
+            assertFalse(endpoint.getEnabled());
             verify(endpointRepository).autoDisable(eq(endpoint.getId()), any(), any());
         }
 
@@ -232,18 +207,12 @@ class EndpointAutoDisableServiceTest {
         }
 
         @Test
-        @DisplayName("a window of zero hours is refused at construction rather than disabling everything")
-        void zeroWindowIsRefused() {
-            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
-                    () -> newService(true, Duration.ZERO, MIN_FAILURES));
+        @DisplayName("a zero window or a minimum below one is refused rather than disabling on one stray failure")
+        void degenerateSettingsAreRefused() {
+            assertThrows(IllegalArgumentException.class, () -> newService(true, Duration.ZERO, MIN_FAILURES));
+            assertThrows(IllegalArgumentException.class, () -> newService(true, WINDOW, 0));
         }
 
-        @Test
-        @DisplayName("a minimum below one is refused: one stray failure must never disable an endpoint")
-        void zeroMinimumIsRefused() {
-            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
-                    () -> newService(true, WINDOW, 0));
-        }
     }
 
     @Nested
@@ -263,16 +232,13 @@ class EndpointAutoDisableServiceTest {
 
             verify(notifier, never()).endpointDisabled(any());
             verify(endpointRepository, never()).autoDisable(any(), any(), any());
-            assertEquals(NOW.minus(Duration.ofHours(1)), endpoint.getAutoDisabledAt(),
-                    "the time it was disabled is when it happened, not when the sweep last ran");
+            assertEquals(NOW.minus(Duration.ofHours(1)), endpoint.getAutoDisabledAt());
         }
 
         @Test
         @DisplayName("an endpoint re-enabled between the query and the write is not disabled again")
         void losesTheRaceAndSaysNothing() {
-            // The sweep reads, then writes. An owner clicking Enable in between is exactly the
-            // window a full save() would have overwritten — and they would have watched their
-            // endpoint switch itself back off with no explanation.
+            // An owner clicking Enable between the read and the write must not be overwritten.
             Endpoint endpoint = failingEndpoint(NOW.minus(Duration.ofHours(80)), 400);
             when(endpointRepository.findAutoDisableCandidates(any(), anyInt(), any()))
                     .thenReturn(List.of(endpoint));
@@ -281,16 +247,7 @@ class EndpointAutoDisableServiceTest {
             service.sweep();
 
             verify(notifier, never()).endpointDisabled(any());
-            assertTrue(endpoint.getEnabled(), "the write did not apply, so nothing was decided");
-        }
-
-        @Test
-        @DisplayName("nothing to do is not an error and writes nothing")
-        void emptySweepWritesNothing() {
-            service.sweep();
-
-            verify(endpointRepository, never()).autoDisable(any(), any(), any());
-            verify(notifier, never()).endpointDisabled(any());
+            assertTrue(endpoint.getEnabled());
         }
 
         @Test

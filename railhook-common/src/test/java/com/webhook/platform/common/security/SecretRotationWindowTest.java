@@ -41,9 +41,7 @@ class SecretRotationWindowTest {
     @Test
     @DisplayName("a clock that has gone backwards does not reopen a closed window forever")
     void clockSkewBeforeRotation() {
-        /* now < rotatedAt happens on a node whose clock is behind. Reporting the window open
-           is the safe answer — an extra signature costs nothing, refusing one breaks a
-           receiver who is mid-migration. */
+        // An extra signature costs nothing; refusing one breaks a receiver mid-migration.
         assertTrue(SecretRotationWindow.isOpen(ROTATED_AT, 24, ROTATED_AT.minusSeconds(3600)));
     }
 }

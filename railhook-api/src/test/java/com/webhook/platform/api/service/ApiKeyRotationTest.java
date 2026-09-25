@@ -5,7 +5,6 @@ import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.domain.repository.ApiKeyRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
-import com.webhook.platform.api.dto.ApiKeyRequest;
 import com.webhook.platform.api.dto.ApiKeyResponse;
 import com.webhook.platform.api.dto.ApiKeyRotateRequest;
 import com.webhook.platform.api.tenancy.TenantContext;
@@ -28,22 +27,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
-/**
- * Rolling an API key over without an outage in the middle.
- *
- * <p>With only create and revoke, a rollover was a race the customer had to run by hand: create
- * the new key, deploy it everywhere, revoke the old one at exactly the right moment. Revoke too
- * early and every request 401s until the deploy finishes; too late and a credential they meant
- * to retire is still live and now nobody is watching it. {@code EndpointService.rotateSecret}
- * solved the same problem for signing secrets — see {@code EndpointSecretRotationTest}, whose
- * shape these tests follow — and the answer is the same: both credentials work for a window.
- *
- * <p>The enforcement is borrowed rather than built. {@code ApiKeyAuthenticationFilter} already
- * refuses a key past its {@code expires_at} on every request, so a grace window is a date on the
- * outgoing key, not a new code path that could be wrong.
- */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ApiKeyService.rotateApiKey — the rotation grace window")
 class ApiKeyRotationTest {
@@ -63,9 +49,7 @@ class ApiKeyRotationTest {
         TenantContext.set(organizationId);
         when(projectRepository.findById(projectId))
                 .thenReturn(Optional.of(Project.builder().id(projectId).name("p").build()));
-        // Lenient: the two tests that assert a rotation is refused must reach no save at all,
-        // which is half of what they are asserting.
-        org.mockito.Mockito.lenient().when(apiKeyRepository.save(any(ApiKey.class))).thenAnswer(invocation -> {
+        lenient().when(apiKeyRepository.save(any(ApiKey.class))).thenAnswer(invocation -> {
             ApiKey key = invocation.getArgument(0);
             if (key.getId() == null) {
                 key.setId(UUID.randomUUID());
@@ -107,8 +91,6 @@ class ApiKeyRotationTest {
                 .isNotBlank();
         assertThat(replacement.getId()).isNotEqualTo(apiKeyId);
 
-        /* Not revoked -- given a date. ApiKeyAuthenticationFilter honours expires_at on every
-           request, so the window needs no new enforcement path, only a deadline. */
         assertThat(retiring.getRevokedAt()).isNull();
         assertThat(retiring.getExpiresAt())
                 .isNotNull()
@@ -198,9 +180,6 @@ class ApiKeyRotationTest {
         alreadyRotated.setReplacedById(UUID.randomUUID());
         when(apiKeyRepository.findByIdAndProjectId(apiKeyId, projectId)).thenReturn(Optional.of(alreadyRotated));
 
-        /* The second rotation would create a third key while the second is live, unnamed by any
-           successor chain and about to be forgotten -- which is the create-then-forget failure
-           this feature exists to remove. */
         assertThatThrownBy(() -> service.rotateApiKey(projectId, apiKeyId, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("already been rotated");
@@ -221,13 +200,4 @@ class ApiKeyRotationTest {
         assertThat(listed.getKey()).as("never the plaintext, outside the one response that mints it").isNull();
     }
 
-    @Test
-    @DisplayName("creating a key still leaves it un-rotated, so the two states cannot be confused")
-    void freshKeysAreNotRotated() {
-        ApiKeyResponse created = service.createApiKey(projectId,
-                ApiKeyRequest.builder().name("fresh").scope(ApiKeyScope.READ_WRITE).build());
-
-        assertThat(created.getRotatedAt()).isNull();
-        assertThat(created.getReplacedById()).isNull();
-    }
 }

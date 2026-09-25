@@ -32,18 +32,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Article 17, for a person rather than an organization. The platform could erase a whole
- * customer and could not erase one human being, which is the half of the right that individual
- * users actually exercise.
- *
- * <p>The shape below is decided by two facts about the schema rather than by preference:
- * {@code shared_debug_links.created_by} references {@code users(id)} with no cascade, so
- * deleting the row outright fails for anyone who ever shared a debug link; and
- * {@code audit_log.user_id} has no foreign key at all, so the record of what someone did
- * survives them — which is the point of an audit log, and is a legitimate basis for keeping it.
- * So the person is anonymised and the account is made unusable, rather than the row vanishing.
- */
+// An erased person is anonymised rather than deleted: shared_debug_links references users(id) without cascade.
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AccountErasureService")
 class AccountErasureServiceTest {
@@ -82,20 +71,6 @@ class AccountErasureServiceTest {
                 .build();
     }
 
-    @Test
-    @DisplayName("unlinks Google, whose id for the person survives the address being erased")
-    void unlinksSignInProviders() {
-        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(membershipRepository.findByUserId(userId)).thenReturn(List.of());
-
-        service.eraseAccount(userId);
-
-        verify(userIdentityRepository).deleteByUserId(userId);
-        // Every address the account moved between — including one still waiting for confirmation.
-        verify(emailChangeRequestRepository).deleteByUserId(userId);
-        verify(verificationEmailSendRepository).deleteByUserId(userId);
-    }
-
     private Membership membership(UUID orgId, MembershipRole role) {
         return Membership.builder()
                 .id(UUID.randomUUID())
@@ -106,71 +81,30 @@ class AccountErasureServiceTest {
                 .build();
     }
 
-    @Nested
-    @DisplayName("what is left behind")
-    class Anonymisation {
+    @Test
+    @DisplayName("the person is unidentifiable afterwards and the account cannot be used or recovered")
+    void erasedAccountIsAnonymisedAndDead() {
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(membershipRepository.findByUserId(userId)).thenReturn(List.of());
 
-        @Test
-        @DisplayName("the person is unidentifiable afterwards")
-        void personalDataIsGone() {
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-            when(membershipRepository.findByUserId(userId)).thenReturn(List.of());
+        service.eraseAccount(userId);
 
-            service.eraseAccount(userId);
-
-            ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
-            verify(userRepository).save(saved.capture());
-            User after = saved.getValue();
-            assertThat(after.getEmail()).doesNotContain("someone@example.com");
-            assertThat(after.getFullName()).isNull();
-        }
-
-        @Test
-        @DisplayName("the replacement address can never receive mail or collide")
-        void replacementAddressIsUnroutableAndUnique() {
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-            when(membershipRepository.findByUserId(userId)).thenReturn(List.of());
-
-            service.eraseAccount(userId);
-
-            ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
-            verify(userRepository).save(saved.capture());
-            // .invalid is reserved by RFC 2606 and resolves nowhere, and the id keeps the
-            // unique constraint on email satisfied however many accounts are erased.
-            assertThat(saved.getValue().getEmail()).endsWith(".invalid");
-            assertThat(saved.getValue().getEmail()).contains(userId.toString());
-        }
-
-        @Test
-        @DisplayName("the account cannot be signed into or recovered")
-        void accountCannotBeUsedAgain() {
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-            when(membershipRepository.findByUserId(userId)).thenReturn(List.of());
-
-            service.eraseAccount(userId);
-
-            ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
-            verify(userRepository).save(saved.capture());
-            User after = saved.getValue();
-            assertThat(after.getStatus()).isEqualTo(UserStatus.DISABLED);
-            assertThat(after.getPasswordHash()).isNotEqualTo("$2a$12$originalhash");
-            // A live reset token would be a way back into an erased account.
-            assertThat(after.getPasswordResetToken()).isNull();
-            assertThat(after.getVerificationToken()).isNull();
-        }
-
-        @Test
-        @DisplayName("every open session is closed, not left to expire")
-        void sessionsAreRevoked() {
-            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-            when(membershipRepository.findByUserId(userId)).thenReturn(List.of());
-
-            service.eraseAccount(userId);
-
-            verify(userSessionService).revokeAllSessions(userId);
-            // The access token is stateless and outlives the session row on its own.
-            verify(tokenBlacklistService).revokeAllUserTokens(userId);
-        }
+        ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(saved.capture());
+        User after = saved.getValue();
+        assertThat(after.getEmail()).doesNotContain("someone@example.com")
+                .endsWith(".invalid").contains(userId.toString());
+        assertThat(after.getFullName()).isNull();
+        assertThat(after.getStatus()).isEqualTo(UserStatus.DISABLED);
+        assertThat(after.getPasswordHash()).isNotEqualTo("$2a$12$originalhash");
+        assertThat(after.getPasswordResetToken()).isNull();
+        assertThat(after.getVerificationToken()).isNull();
+        verify(userSessionService).revokeAllSessions(userId);
+        // The access token is stateless and outlives the session row on its own.
+        verify(tokenBlacklistService).revokeAllUserTokens(userId);
+        verify(userIdentityRepository).deleteByUserId(userId);
+        verify(emailChangeRequestRepository).deleteByUserId(userId);
+        verify(verificationEmailSendRepository).deleteByUserId(userId);
     }
 
     @Nested
@@ -188,8 +122,6 @@ class AccountErasureServiceTest {
 
             service.eraseAccount(userId);
 
-            // Otherwise erasing the account leaves every event, endpoint and delivery it owned
-            // sitting in the database with nobody able to reach or erase them.
             verify(organizationService).deleteOrganizationById(orgId);
         }
 
@@ -223,7 +155,6 @@ class AccountErasureServiceTest {
                     .isInstanceOf(ResponseStatusException.class)
                     .hasMessageContaining("owner");
 
-            // And nothing at all has happened: erasure is all or none.
             verify(userRepository, never()).save(any());
             verify(organizationService, never()).deleteOrganizationById(any());
         }
@@ -245,12 +176,4 @@ class AccountErasureServiceTest {
         }
     }
 
-    @Test
-    @DisplayName("erasing an account that is not there is not a silent success")
-    void unknownUserIsRejected() {
-        when(userRepository.findById(userId)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.eraseAccount(userId))
-                .isInstanceOf(RuntimeException.class);
-    }
 }

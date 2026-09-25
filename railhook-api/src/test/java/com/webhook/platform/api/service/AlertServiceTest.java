@@ -76,8 +76,6 @@ class AlertServiceTest {
 
     @BeforeEach
     void setUp() {
-        // validateProjectAccess resolves the organization as a value, so these tests have to
-        // enter a scope the way a request would.
         TenantContext.set(organizationId);
         service = new AlertService(ruleRepository, eventRepository, projectRepository,
                 incidentRepository, timelineRepository, notificationService, membershipRepository,
@@ -97,12 +95,7 @@ class AlertServiceTest {
         TenantContext.clear();
     }
 
-    /**
-     * An EMAIL rule sends a message, about once a minute while its condition holds, to every address
-     * in it — with the rule's name, which the user typed, in the subject. Any address at all was
-     * accepted, which made alert rules a way to send mail from this deployment's domain to whoever
-     * the user chose.
-     */
+    // Any address was accepted, making alert rules a way to mail anyone from this domain.
     @Nested
     @DisplayName("Alert rule email recipients are addresses of the organization's verified members, at most ten")
     class EmailRecipients {
@@ -161,7 +154,6 @@ class AlertServiceTest {
 
             @BeforeEach
             void stubVerifiedMembers() {
-                // The organization's verified members: whichever of the asked-for addresses are theirs.
                 Set<String> members = Set.of("ops@company.com", "dev@company.com");
                 when(membershipRepository.findVerifiedMemberEmailsIn(anyCollection())).thenAnswer(inv -> {
                     Collection<String> asked = inv.getArgument(0);
@@ -211,16 +203,7 @@ class AlertServiceTest {
         }
     }
 
-    /**
-     * An alert rule's notification webhook is a URL the server fetches on the user's behalf, so it
-     * is an SSRF sink like any other — and it was the one outbound URL in the product nobody
-     * validated.
-     *
-     * <p>It was unreachable while nothing evaluated rules, which is why it went unnoticed. The
-     * evaluator that now fires alerts is exactly what makes it reachable, so the validation lands
-     * in the same change rather than after it: otherwise the commit that fixed alerting would have
-     * been the commit that opened an authenticated SSRF onto the cloud metadata endpoint.
-     */
+    // The notification webhook is fetched server-side, so it is an SSRF sink.
     @Nested
     @DisplayName("AlertService — a rule's notification URL is validated like any other outbound URL")
     class WebhookUrlValidation {
@@ -252,8 +235,6 @@ class AlertServiceTest {
         @Test
         @DisplayName("clearing the URL with a blank string is not a validation failure")
         void blankUrlClearsRatherThanFails() {
-            /* updateRule treats blank as "remove the URL". Running that through the validator
-               would make the only way to unset a bad URL impossible. */
             assertThatCode(() -> service.updateRule(projectId, ruleId, request("  ")))
                     .doesNotThrowAnyException();
         }

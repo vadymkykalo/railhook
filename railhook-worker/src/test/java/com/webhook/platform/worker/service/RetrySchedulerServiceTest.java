@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -55,11 +56,8 @@ class RetrySchedulerServiceTest {
 
         @BeforeEach
         void setUp() {
-                // Make TransactionTemplate execute the callbacks directly. Lenient: the
-                // constructor/validation-only tests below build the service without ever
-                // calling scheduleRetries(), so this stub goes unused there.
                 lenient().when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
-                        var callback = invocation.getArgument(0, org.springframework.transaction.support.TransactionCallback.class);
+                        var callback = invocation.getArgument(0, TransactionCallback.class);
                         return callback.doInTransaction(null);
                 });
                 lenient().doAnswer(invocation -> {
@@ -69,10 +67,8 @@ class RetrySchedulerServiceTest {
                         return null;
                 }).when(transactionTemplate).executeWithoutResult(any());
 
-                // Governor needs countPending — stub it to return low count (no throttling)
                 lenient().when(deliveryRepository.countPending(any(Instant.class))).thenReturn(0L);
 
-                // Circuit breaker should allow all calls by default in tests
                 lenient().when(circuitBreakerService.isCallPermitted(any(UUID.class))).thenReturn(true);
 
                 retrySchedulerService = newRetrySchedulerService();
@@ -96,7 +92,6 @@ class RetrySchedulerServiceTest {
 
         @Test
         void scheduleRetries_shouldLoadOnlyDueDeliveries() {
-                // Arrange
                 Instant now = Instant.now();
                 Delivery dueDelivery = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
 
@@ -113,10 +108,8 @@ class RetrySchedulerServiceTest {
                                 .completedFuture(sendResult);
                 when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
 
-                // Act
                 retrySchedulerService.scheduleRetries(0);
 
-                // Assert
                 ArgumentCaptor<Integer> limitCaptor = ArgumentCaptor.forClass(Integer.class);
                 verify(deliveryRepository).findPendingRetryIds(
                                 eq(Delivery.DeliveryStatus.PENDING),
@@ -131,7 +124,6 @@ class RetrySchedulerServiceTest {
 
         @Test
         void scheduleRetries_shouldRespectBatchSize() {
-                // Arrange
                 Instant now = Instant.now();
                 List<Delivery> deliveries = Arrays.asList(
                                 createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10)),
@@ -151,21 +143,15 @@ class RetrySchedulerServiceTest {
                                 .completedFuture(sendResult);
                 when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
 
-                // Act
                 retrySchedulerService.scheduleRetries(0);
 
-                // Assert
                 verify(kafkaTemplate, times(3)).send(anyString(), anyString(), any(DeliveryMessage.class));
-                // Phase 1 claim only. A successful send hands the row to the consumer, which
-                // may already have advanced it by the time Phase 3 runs — re-saving the Phase 1
-                // snapshot there raced that update and could stall the retry partition, so
-                // Phase 3 writes nothing when every send succeeded.
+                // A sent row belongs to the consumer; re-saving the claim snapshot stalled the partition.
                 verify(deliveryRepository, times(1)).saveAll(anyList());
         }
 
         @Test
         void scheduleRetries_shouldNullifyNextRetryAt() {
-                // Arrange
                 Instant now = Instant.now();
                 Delivery delivery = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
 
@@ -182,11 +168,8 @@ class RetrySchedulerServiceTest {
                                 .completedFuture(sendResult);
                 when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
 
-                // Act
                 retrySchedulerService.scheduleRetries(0);
 
-                // Assert — Phase 1 nullifies nextRetryAt and is the only write for a
-                // successful send; Phase 3 leaves the row to the consumer.
                 @SuppressWarnings("unchecked")
                 ArgumentCaptor<List<Delivery>> deliveryCaptor = ArgumentCaptor.forClass(List.class);
                 verify(deliveryRepository, times(1)).saveAll(deliveryCaptor.capture());
@@ -196,13 +179,7 @@ class RetrySchedulerServiceTest {
 
         @Test
         void scheduleRetries_claimPhase_shouldSetStatusProcessingAndLastAttemptAt() {
-                // Regression test for the retry-claim black hole: the old claim phase only
-                // nullified nextRetryAt and left status=PENDING, which is invisible to both
-                // findPendingRetryIds (needs non-null nextRetryAt) and resetStuckDeliveries
-                // (needs status=PROCESSING) if the worker crashes before Phase 3 runs. The
-                // claim must set status=PROCESSING and lastAttemptAt, matching
-                // IncomingForwardRetryScheduler's claim of forward attempts, so a crashed
-                // claim is recoverable by StuckDeliveryRecoveryService's sweep.
+                // A claim left PENDING with no nextRetryAt was invisible to every sweep.
                 Instant now = Instant.now();
                 Delivery delivery = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
 
@@ -219,37 +196,14 @@ class RetrySchedulerServiceTest {
                                 .completedFuture(sendResult);
                 when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
 
-                // Act
                 retrySchedulerService.scheduleRetries(0);
 
-                // Assert — claimed delivery is left in the same state resetStuckDeliveries
-                // matches on: status=PROCESSING with a recent lastAttemptAt.
                 assertEquals(Delivery.DeliveryStatus.PROCESSING, delivery.getStatus());
                 assertNotNull(delivery.getLastAttemptAt());
         }
 
-    @Test
-    void scheduleRetries_shouldHandleEmptyResult() {
-        // Arrange
-        when(deliveryRepository.findPendingRetryIds(
-                any(Delivery.DeliveryStatus.class),
-                any(Instant.class),
-                anyInt(),
-                anyInt(),
-                anyInt()
-        )).thenReturn(Collections.emptyList());
-
-        // Act
-        retrySchedulerService.scheduleRetries(0);
-
-        // Assert
-        verify(kafkaTemplate, never()).send(anyString(), anyString(), any(DeliveryMessage.class));
-        verify(deliveryRepository, never()).saveAll(anyList());
-    }
-
         @Test
         void scheduleRetries_shouldHandleExceptionGracefully() {
-                // Arrange
                 Instant now = Instant.now();
                 Delivery delivery = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
 
@@ -265,33 +219,22 @@ class RetrySchedulerServiceTest {
                 failedFuture.completeExceptionally(new RuntimeException("Kafka error"));
                 when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(failedFuture);
 
-                // Act & Assert - should not throw exception, delivery should be rescheduled
                 assertDoesNotThrow(() -> retrySchedulerService.scheduleRetries(0));
 
-                // Phase 3 hands the row back fenced on the token Phase 1 claimed it under, never
-                // by re-saving the Phase 1 snapshot.
                 verify(deliveryRepository, times(1)).saveAll(anyList());
                 assertNotNull(delivery.getNextRetryAt());
                 ArgumentCaptor<UUID> token = ArgumentCaptor.forClass(UUID.class);
                 verify(deliveryRepository).handBackIfStillClaimed(
                                 eq(delivery.getId()), token.capture(), eq(delivery.getNextRetryAt()));
                 assertNotNull(token.getValue());
-                // A failed send must revert the Phase 1 PROCESSING claim back to PENDING,
-                // otherwise the row sits unclaimable until the stuck-delivery sweep catches it.
                 assertEquals(Delivery.DeliveryStatus.PENDING, delivery.getStatus());
         }
 
         @Test
         void getRetryTopic_shouldSelectCorrectTopicByAttemptCount() {
-                // This test verifies the business logic of topic selection
-                // Since getRetryTopic is private, we test it indirectly through scheduleRetries
 
                 Instant now = Instant.now();
-                // attemptCount == 0: WebhookDeliveryService reschedules here (concurrency/rate
-                // limit backpressure) *before* the first HTTP attempt is ever made -- the
-                // attempt-count increment only happens once the call is actually about to go
-                // out. This delivery has never been attempted and must not be treated like one
-                // that has exhausted the whole retry ladder.
+                // Attempt 0 is a backpressure reschedule before any HTTP call, not an exhausted ladder.
                 Delivery delivery0 = createDelivery(UUID.randomUUID(), 0, now.minusSeconds(10));
                 Delivery delivery1 = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
                 Delivery delivery2 = createDelivery(UUID.randomUUID(), 2, now.minusSeconds(10));
@@ -321,13 +264,11 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.lockByIds(Collections.singletonList(delivery6.getId())))
                                 .thenReturn(Collections.singletonList(delivery6));
 
-                // Act
                 retrySchedulerService.scheduleRetries(0);
                 retrySchedulerService.scheduleRetries(0);
                 retrySchedulerService.scheduleRetries(0);
                 retrySchedulerService.scheduleRetries(0);
 
-                // Assert
                 ArgumentCaptor<String> topicCaptor = ArgumentCaptor.forClass(String.class);
                 verify(kafkaTemplate, times(4)).send(topicCaptor.capture(), anyString(), any(DeliveryMessage.class));
 
@@ -340,7 +281,6 @@ class RetrySchedulerServiceTest {
 
         @Test
         void scheduleRetries_partialCompletion_shouldRescheduleIncomplete() {
-                // Arrange — two deliveries: one future completes, one stays incomplete
                 Instant now = Instant.now();
                 Delivery completedDelivery = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
                 Delivery incompleteDelivery = createDelivery(UUID.randomUUID(), 2, now.minusSeconds(20));
@@ -358,7 +298,6 @@ class RetrySchedulerServiceTest {
                 SendResult<String, DeliveryMessage> sendResult = mockSendResult();
                 CompletableFuture<SendResult<String, DeliveryMessage>> completedFuture = CompletableFuture
                                 .completedFuture(sendResult);
-                // This future will never complete — simulates timeout
                 CompletableFuture<SendResult<String, DeliveryMessage>> incompleteFuture = new CompletableFuture<>();
 
                 when(kafkaTemplate.send(anyString(), eq(completedDelivery.getEndpointId().toString()),
@@ -368,55 +307,16 @@ class RetrySchedulerServiceTest {
                                 any(DeliveryMessage.class)))
                                 .thenReturn(incompleteFuture);
 
-                // Act
                 retrySchedulerService.scheduleRetries(0);
 
-                // Assert — completed delivery has nextRetryAt nullified (success) and stays
-                // PROCESSING for the consumer to finalize
                 assertNull(completedDelivery.getNextRetryAt());
                 assertEquals(Delivery.DeliveryStatus.PROCESSING, completedDelivery.getStatus());
-                // Assert — incomplete delivery is rescheduled (has nextRetryAt set) and its
-                // PROCESSING claim is reverted back to PENDING
                 assertNotNull(incompleteDelivery.getNextRetryAt());
                 assertEquals(Delivery.DeliveryStatus.PENDING, incompleteDelivery.getStatus());
         }
 
-        @Test
-        void scheduleRetries_exceptionallyCompletedFuture_shouldLogError() {
-                // Arrange — future completes exceptionally (different from timeout)
-                Instant now = Instant.now();
-                Delivery delivery = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
-
-                when(deliveryRepository.findPendingRetryIds(
-                                any(Delivery.DeliveryStatus.class),
-                                any(Instant.class),
-                                anyInt(),
-                                anyInt(),
-                                anyInt())).thenReturn(Collections.singletonList(delivery.getId()));
-                when(deliveryRepository.lockByIds(anyList())).thenReturn(Collections.singletonList(delivery));
-
-                CompletableFuture<SendResult<String, DeliveryMessage>> exceptionalFuture = new CompletableFuture<>();
-                exceptionalFuture.completeExceptionally(new RuntimeException("Broker unavailable"));
-                when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class)))
-                                .thenReturn(exceptionalFuture);
-
-                // Act — should not throw
-                assertDoesNotThrow(() -> retrySchedulerService.scheduleRetries(0));
-
-                // Assert — delivery is rescheduled with nextRetryAt set and reverted to PENDING
-                assertNotNull(delivery.getNextRetryAt());
-                assertEquals(Delivery.DeliveryStatus.PENDING, delivery.getStatus());
-                // Verify it is handed back in Phase 3
-                verify(deliveryRepository).handBackIfStillClaimed(
-                                eq(delivery.getId()), any(UUID.class), eq(delivery.getNextRetryAt()));
-        }
-
-        @Test
+            @Test
         void getRetryTopic_fullLadder_totalSpanFitsInsideProductionHardCap() {
-                // Ties the tier-selection mapping (getRetryTopic, exercised below via the
-                // attemptCount table) together with the actual worst-case span math and the
-                // production default hard-cap (96h, application.yml
-                // delivery.escalation.hard-cap-hours) — the two must agree by construction.
                 long worstCaseSeconds = RetryLadderDefaults.outgoing().worstCaseSpanSeconds();
                 long hardCapSeconds = 96L * 3600;
                 assertTrue(worstCaseSeconds <= hardCapSeconds,

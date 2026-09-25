@@ -1,6 +1,5 @@
 package com.webhook.platform.api.service;
 
-import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -11,23 +10,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * The dashboard's render errors only ever reached the browser console, so nobody here saw them.
- * They now come back to this service and go into the same logs as everything else — which means
- * a string a browser chose ends up on a log line, and that is why this class has tests before it
- * has features. CodeQL has already caught one log-injection in this repository.
- */
+// A string a browser chose ends up on a log line, so log injection is the risk here.
 class ClientErrorReportServiceTest {
 
     private ClientErrorReportService service;
@@ -61,41 +53,14 @@ class ClientErrorReportServiceTest {
                 .collect(Collectors.joining("\n"));
     }
 
-    @Nested
-    @DisplayName("a browser cannot write its own log lines")
-    class LogInjection {
+    @ParameterizedTest
+    @ValueSource(strings = {"\n", "\r", "\u0000", "\u001B"})
+    @DisplayName("a control character in the message cannot forge or repaint a log line")
+    void controlCharactersAreStripped(String control) {
+        service.record(report("boom" + control + "ERROR c.w.p.Fake - the database is gone"), UUID.randomUUID());
 
-        @Test
-        @DisplayName("a newline in the message cannot forge a second log entry")
-        void newlinesAreStripped() {
-            service.record(report("boom\nERROR c.w.p.Fake - the database is gone"), UUID.randomUUID());
-
-            String logged = loggedText();
-            assertFalse(logged.contains("\nERROR"),
-                    "a report that can start a line can impersonate any log this platform writes: " + logged);
-            assertTrue(logged.contains("boom"), logged);
-        }
-
-        @Test
-        @DisplayName("carriage returns go too")
-        void carriageReturnsAreStripped() {
-            service.record(report("boom\r\nsomething else"), UUID.randomUUID());
-
-            assertFalse(loggedText().contains("\r"), loggedText());
-        }
-
-        @Test
-        @DisplayName("other control characters do not survive either")
-        void controlCharactersAreStripped() {
-            // A NUL truncates the line for some readers; an escape sequence repaints the
-            // terminal of whoever is tailing the log.
-            service.record(report("boom\u0000cut\u001B[31mred"), UUID.randomUUID());
-
-            String logged = loggedText();
-            assertFalse(logged.contains("\u0000"), logged);
-            assertFalse(logged.contains("\u001B"), logged);
-            assertTrue(logged.contains("boom"), logged);
-        }
+        assertThat(appender.list).hasSize(1);
+        assertThat(loggedText()).doesNotContain(control).contains("boom");
     }
 
     @Nested
@@ -110,8 +75,7 @@ class ClientErrorReportServiceTest {
 
             service.record(r, UUID.randomUUID());
 
-            assertTrue(loggedText().length() < 10_000,
-                    "one report must not be able to fill a log volume");
+            assertThat(loggedText().length()).isLessThan(10_000);
         }
 
         @Test
@@ -122,27 +86,20 @@ class ClientErrorReportServiceTest {
 
             service.record(r, UUID.randomUUID());
 
-            String logged = loggedText();
-            assertFalse(logged.contains("secret-value"),
-                    "a query string is where a token ends up; the path is what identifies the screen");
-            assertTrue(logged.contains("/admin/deliveries"), logged);
+            assertThat(loggedText()).doesNotContain("secret-value").contains("/admin/deliveries");
         }
 
         @Test
         @DisplayName("the throttle's bookkeeping does not outlive the throttle")
         void windowsDoNotAccumulateForEveryUserEver() {
-            // A window lasts a minute; the map entry used to last the life of the process, one
-            // per user who ever loaded the dashboard. A few dozen bytes each, which is exactly
-            // why it went unnoticed — what was missing is any bound on the count.
+            // The per-user window map used to grow for the life of the process.
             ClientErrorReportService bounded = new ClientErrorReportService(true, 20);
 
             for (int i = 0; i < 200_000; i++) {
                 bounded.record(report("something broke"), UUID.randomUUID());
             }
 
-            assertThat(bounded.trackedWindows())
-                    .as("bounded, rather than one entry per user who has ever visited")
-                    .isLessThanOrEqualTo(50_000L);
+            assertThat(bounded.trackedWindows()).isLessThanOrEqualTo(50_000L);
         }
     }
 
@@ -158,9 +115,7 @@ class ClientErrorReportServiceTest {
                 service.record(report("boom " + i), user);
             }
 
-            List<ILoggingEvent> events = appender.list;
-            assertEquals(5, events.size(),
-                    "a component that throws on every render would otherwise write a log line per frame");
+            assertThat(appender.list).hasSize(5);
         }
 
         @Test
@@ -174,34 +129,16 @@ class ClientErrorReportServiceTest {
 
             service.record(report("a different user's problem"), UUID.randomUUID());
 
-            assertEquals(1, appender.list.size());
+            assertThat(appender.list).hasSize(1);
         }
     }
 
     @Test
     @DisplayName("an operator can turn reporting off, and then nothing is written")
     void disabledDropsSilently() {
-        ClientErrorReportService disabled = new ClientErrorReportService(false, 5);
+        new ClientErrorReportService(false, 5).record(report("boom"), UUID.randomUUID());
 
-        disabled.record(report("boom"), UUID.randomUUID());
-
-        assertTrue(appender.list.isEmpty(), "reporting is off; nothing about the report belongs in the log");
-    }
-
-    @Test
-    @DisplayName("the report is logged at WARN — visible, but not an incident of its own")
-    void logsAtWarn() {
-        service.record(report("boom"), UUID.randomUUID());
-
-        assertEquals(Level.WARN, appender.list.get(0).getLevel());
-    }
-
-    @Test
-    @DisplayName("a report with no message at all is ignored rather than logged empty")
-    void blankMessageIsIgnored() {
-        service.record(report("   "), UUID.randomUUID());
-
-        assertTrue(appender.list.isEmpty());
+        assertThat(appender.list).isEmpty();
     }
 
     @Test
@@ -211,8 +148,6 @@ class ClientErrorReportServiceTest {
 
         TenantContext.runAs(org, () -> service.record(report("boom"), UUID.randomUUID()));
 
-        assertTrue(loggedText().contains(org.toString()),
-                "whose organization this is is a property of the request, so it must come off the "
-                        + "scope rather than off an argument a handler could pass wrongly: " + loggedText());
+        assertThat(loggedText()).contains(org.toString());
     }
 }

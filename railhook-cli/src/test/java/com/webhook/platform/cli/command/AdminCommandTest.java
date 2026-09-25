@@ -13,24 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * The operator back-office, from a terminal.
- *
- * <p>Three things are being held down, and only the first is about output.
- *
- * <p><strong>The credential never comes from the config file.</strong> Every other command here
- * reads a bearer token that {@code railhook login} saved; this one must not, because the token
- * is the deployment's rather than a person's and is the same secret for every tenant on it. A
- * command that silently fell back to the saved login would either do nothing or, worse, appear
- * to work while sending the wrong credential.
- *
- * <p><strong>-1 means unlimited.</strong> It is how the whole plan catalog spells it, and the
- * dashboard already had to be taught not to print it as a number — a plan that allows minus one
- * project. A terminal has no styling to soften that.
- *
- * <p><strong>A suspension says what the tenant can still do.</strong> Reads keep working, which
- * is the surprising half and the reason support can talk to somebody who has been suspended.
- */
+/** The operator token is the deployment's, never the saved login's; -1 prints as unlimited. */
 class AdminCommandTest extends CliCommandTestBase {
 
     private static final String TOKEN = "operator-token";
@@ -87,7 +70,6 @@ class AdminCommandTest extends CliCommandTestBase {
 
         run("admin", "orgs", "--suspended", "--token", TOKEN);
 
-        // The reason is the whole content of the row for a suspended tenant.
         assertTrue(out().contains("SUSPENDED"), out());
         assertTrue(out().contains("spam reports"), out());
     }
@@ -106,7 +88,6 @@ class AdminCommandTest extends CliCommandTestBase {
 
         assertEquals(0, exitCode);
         assertTrue(out().contains("2500 / 10000"), out());
-        // -1 is unlimited. Printed raw it reads as a plan that allows minus one project.
         assertTrue(out().contains("unlimited"), out());
         assertFalse(out().contains("/ -1"), out());
     }
@@ -120,7 +101,6 @@ class AdminCommandTest extends CliCommandTestBase {
 
         int exitCode = run("admin", "org", "org-1", "--token", TOKEN);
 
-        // Who this is and whether they are suspended is the part an operator opened this for.
         assertEquals(0, exitCode);
         assertTrue(out().contains("Acme"), out());
         assertTrue(out().contains("unavailable"), out());
@@ -137,7 +117,7 @@ class AdminCommandTest extends CliCommandTestBase {
 
         assertEquals(0, exitCode);
         assertTrue(out().contains("spam reports"), out());
-        // Reads keep working. An operator who does not know that tells the customer to wait.
+        // Reads keep working; an operator who does not know that tells the customer to wait.
         assertTrue(out().toLowerCase().contains("read"), out());
     }
 
@@ -146,8 +126,6 @@ class AdminCommandTest extends CliCommandTestBase {
         server.start();
         writeConfig(authenticatedConfig());
 
-        // The tenant is shown the reason, so a suspension without one is not a thing to allow
-        // by accident from a shell.
         int exitCode = run("admin", "suspend", "org-1", "--token", TOKEN);
 
         assertTrue(exitCode != 0);
@@ -157,8 +135,6 @@ class AdminCommandTest extends CliCommandTestBase {
     @Test
     void refusesToFallBackToTheSavedLogin() throws Exception {
         server.start();
-        // A saved tenant login is present and must not be used: it is a different credential
-        // for a different question, and sending it here would fail in a confusing way.
         writeConfig(authenticatedConfig());
 
         int exitCode = run("admin", "orgs");

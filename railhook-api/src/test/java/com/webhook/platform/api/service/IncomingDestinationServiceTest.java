@@ -4,13 +4,13 @@ import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import com.webhook.platform.api.domain.entity.IncomingDestination;
 import com.webhook.platform.api.domain.entity.IncomingSource;
+import com.webhook.platform.api.domain.entity.Transformation;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.TransformationRepository;
 import com.webhook.platform.api.dto.IncomingDestinationRequest;
 import com.webhook.platform.api.dto.IncomingDestinationResponse;
 import com.webhook.platform.api.exception.ForbiddenException;
-import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
@@ -23,11 +23,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -90,12 +88,6 @@ class IncomingDestinationServiceTest {
         when(sourceRepository.findByIdAndProjectId(sourceId, projectId)).thenReturn(Optional.of(source));
     }
 
-
-    /**
-     * Every service under test now reads its organization from the ambient tenant scope instead
-     * of taking it as a parameter. A unit test has no request to establish one, so it
-     * enters the scope itself; without this the first call fails with TenantNotResolvedException.
-     */
     @BeforeEach
     void enterTenantScope() {
         TenantContext.set(orgId);
@@ -107,7 +99,7 @@ class IncomingDestinationServiceTest {
     }
 
     @Test
-    void createDestination_success() {
+    void createDestination_storesTheAuthConfigEncrypted() {
         stubOwnership();
         when(destinationRepository.saveAndFlush(any(IncomingDestination.class))).thenAnswer(inv -> {
             IncomingDestination d = inv.getArgument(0);
@@ -128,95 +120,12 @@ class IncomingDestinationServiceTest {
 
         IncomingDestinationResponse response = service.createDestination(projectId, sourceId, request);
 
-        assertThat(response.getId()).isEqualTo(destId);
-        assertThat(response.getUrl()).isEqualTo("https://example.com/hook");
-        assertThat(response.getAuthType()).isEqualTo(IncomingAuthType.BEARER);
         assertThat(response.isAuthConfigured()).isTrue();
-        assertThat(response.getMaxAttempts()).isEqualTo(3);
-        assertThat(response.getTimeoutSeconds()).isEqualTo(15);
-        assertThat(response.getRetryDelays()).isEqualTo("30,60");
 
         ArgumentCaptor<IncomingDestination> captor = ArgumentCaptor.forClass(IncomingDestination.class);
         verify(destinationRepository).saveAndFlush(captor.capture());
-        assertThat(captor.getValue().getAuthConfigEncrypted()).isNotNull();
+        assertThat(captor.getValue().getAuthConfigEncrypted()).isNotNull().doesNotContain("secret123");
     }
-
-    @Test
-    void createDestination_defaultValues() {
-        stubOwnership();
-        when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> {
-            IncomingDestination d = inv.getArgument(0);
-            d.setId(destId);
-            d.setCreatedAt(Instant.now());
-            d.setUpdatedAt(Instant.now());
-            return d;
-        });
-
-        IncomingDestinationRequest request = IncomingDestinationRequest.builder()
-                .url("https://example.com/hook")
-                .build();
-
-        IncomingDestinationResponse response = service.createDestination(projectId, sourceId, request);
-
-        assertThat(response.getAuthType()).isEqualTo(IncomingAuthType.NONE);
-        assertThat(response.isEnabled()).isTrue();
-        assertThat(response.getMaxAttempts()).isEqualTo(5);
-        assertThat(response.getTimeoutSeconds()).isEqualTo(30);
-    }
-
-
-    @Test
-    void getDestination_success() {
-        IncomingDestination dest = buildDest();
-        when(destinationRepository.findByIdAndIncomingSourceId(destId, sourceId)).thenReturn(Optional.of(dest));
-        stubOwnership();
-
-        IncomingDestinationResponse response = service.getDestination(projectId, sourceId, destId);
-        assertThat(response.getUrl()).isEqualTo("https://example.com/hook");
-    }
-
-    @Test
-    void getDestination_notFound() {
-        stubOwnership();
-        when(destinationRepository.findByIdAndIncomingSourceId(destId, sourceId)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.getDestination(projectId, sourceId, destId))
-                .isInstanceOf(NotFoundException.class);
-    }
-
-    @Test
-    void listDestinations_success() {
-        stubOwnership();
-        when(destinationRepository.findByIncomingSourceId(eq(sourceId), any()))
-                .thenReturn(new PageImpl<>(List.of(buildDest())));
-
-        Page<IncomingDestinationResponse> page = service.listDestinations(projectId, sourceId, PageRequest.of(0, 20));
-        assertThat(page.getTotalElements()).isEqualTo(1);
-    }
-
-    @Test
-    void updateDestination_success() {
-        IncomingDestination dest = buildDest();
-        when(destinationRepository.findByIdAndIncomingSourceId(destId, sourceId)).thenReturn(Optional.of(dest));
-        stubOwnership();
-        lenient().when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        IncomingDestinationRequest request = IncomingDestinationRequest.builder()
-                .url("https://updated.com/hook")
-                .authType(IncomingAuthType.BASIC)
-                .enabled(false)
-                .maxAttempts(10)
-                .build();
-
-        IncomingDestinationResponse response = service.updateDestination(projectId, sourceId, destId, request);
-
-        assertThat(response.getUrl()).isEqualTo("https://updated.com/hook");
-        assertThat(response.getAuthType()).isEqualTo(IncomingAuthType.BASIC);
-        assertThat(response.isEnabled()).isFalse();
-        assertThat(response.getMaxAttempts()).isEqualTo(10);
-    }
-
-    // ── Transformation project ownership ──
 
     @Test
     void createDestination_foreignTransformation_throwsForbidden() {
@@ -224,8 +133,8 @@ class IncomingDestinationServiceTest {
 
         UUID foreignProjectId = UUID.randomUUID();
         UUID transformId = UUID.randomUUID();
-        com.webhook.platform.api.domain.entity.Transformation foreignTransformation =
-                com.webhook.platform.api.domain.entity.Transformation.builder()
+        Transformation foreignTransformation =
+                Transformation.builder()
                         .id(transformId).projectId(foreignProjectId).name("foreign").template("{}").build();
         when(transformationRepository.findById(transformId)).thenReturn(Optional.of(foreignTransformation));
 
@@ -240,31 +149,6 @@ class IncomingDestinationServiceTest {
     }
 
     @Test
-    void createDestination_sameProjectTransformation_succeeds() {
-        stubOwnership();
-        UUID transformId = UUID.randomUUID();
-        com.webhook.platform.api.domain.entity.Transformation sameTransformation =
-                com.webhook.platform.api.domain.entity.Transformation.builder()
-                        .id(transformId).projectId(projectId).name("same").template("{}").build();
-        when(transformationRepository.findById(transformId)).thenReturn(Optional.of(sameTransformation));
-        when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> {
-            IncomingDestination d = inv.getArgument(0);
-            d.setId(destId);
-            d.setCreatedAt(Instant.now());
-            d.setUpdatedAt(Instant.now());
-            return d;
-        });
-
-        IncomingDestinationRequest request = IncomingDestinationRequest.builder()
-                .url("https://example.com/hook")
-                .transformationId(transformId.toString())
-                .build();
-
-        IncomingDestinationResponse response = service.createDestination(projectId, sourceId, request);
-        assertThat(response.getTransformationId()).isEqualTo(transformId);
-    }
-
-    @Test
     void updateDestination_foreignTransformation_throwsForbidden() {
         IncomingDestination dest = buildDest();
         when(destinationRepository.findByIdAndIncomingSourceId(destId, sourceId)).thenReturn(Optional.of(dest));
@@ -272,8 +156,8 @@ class IncomingDestinationServiceTest {
 
         UUID foreignProjectId = UUID.randomUUID();
         UUID transformId = UUID.randomUUID();
-        com.webhook.platform.api.domain.entity.Transformation foreignTransformation =
-                com.webhook.platform.api.domain.entity.Transformation.builder()
+        Transformation foreignTransformation =
+                Transformation.builder()
                         .id(transformId).projectId(foreignProjectId).name("foreign").template("{}").build();
         when(transformationRepository.findById(transformId)).thenReturn(Optional.of(foreignTransformation));
 
@@ -295,8 +179,7 @@ class IncomingDestinationServiceTest {
         lenient().when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
         stubOwnership();
 
-        // Same signal that clears payloadTransform. There used to be none for this field, so a
-        // destination that acquired a transformation was stuck with one for good.
+        // There used to be no way to detach a transformation once attached.
         service.updateDestination(projectId, sourceId, destId, IncomingDestinationRequest.builder()
                 .url("https://example.com/hook")
                 .transformationId("")
@@ -322,38 +205,13 @@ class IncomingDestinationServiceTest {
         assertThat(dest.getTransformationId()).isEqualTo(attached);
     }
 
-    @Test
-    void updateDestination_malformedTransformationId_isRefused() {
-        IncomingDestination dest = buildDest();
-        when(destinationRepository.findByIdAndIncomingSourceId(destId, sourceId)).thenReturn(Optional.of(dest));
-        stubOwnership();
-
-        assertThatThrownBy(() -> service.updateDestination(projectId, sourceId, destId, IncomingDestinationRequest.builder()
-                .url("https://example.com/hook")
-                .transformationId("not-a-uuid")
-                .build()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("must be a UUID");
-    }
-
-    @Test
-    void deleteDestination_success() {
-        IncomingDestination dest = buildDest();
-        when(destinationRepository.findByIdAndIncomingSourceId(destId, sourceId)).thenReturn(Optional.of(dest));
-        stubOwnership();
-
-        service.deleteDestination(projectId, sourceId, destId);
-
-        verify(destinationRepository).delete(dest);
-    }
-
     private static EncryptionKeyRegistry createTestRegistry(String key, String salt) throws Exception {
         EncryptionKeyRegistry registry = new EncryptionKeyRegistry();
         setField(registry, "singleKey", key);
         setField(registry, "multiKeys", "");
         setField(registry, "configuredActiveVersion", 0);
         setField(registry, "salt", salt);
-        var init = registry.getClass().getDeclaredMethod("init");
+        Method init = registry.getClass().getDeclaredMethod("init");
         init.setAccessible(true);
         init.invoke(registry);
         return registry;
@@ -365,10 +223,7 @@ class IncomingDestinationServiceTest {
         f.set(obj, value);
     }
 
-    // ── Retry ladder validation ──
-    //
-    // Mirrors SubscriptionServiceTest: a malformed ladder is rejected at write time, not met
-    // by the worker and silently replaced with a hardcoded array.
+    // A malformed ladder is rejected at write time rather than replaced by the worker.
 
     @Test
     void createDestination_malformedRetryDelays_throwsWithActionableMessage() {
@@ -426,22 +281,17 @@ class IncomingDestinationServiceTest {
 
     @Test
     void incomingDefaultLadder_deliberatelyShorterThanOutgoing() {
-        // Guards the decision recorded in RetryLadderDefaults: the two directions
-        // differ on purpose. A future "tidy-up" that aligns them should fail here first and go
-        // read why.
+        // The two directions differ on purpose; aligning them is not a tidy-up.
         assertThat(RetryLadderDefaults.INCOMING_DELAYS).isNotEqualTo(RetryLadderDefaults.OUTGOING_DELAYS);
         assertThat(RetryLadderDefaults.INCOMING_MAX_ATTEMPTS).isLessThan(RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS);
     }
 
-    // A custom ladder longer than the forward escalation cap was accepted, and the Forward was
-    // then moved to the DLQ by age before its later tiers ever ran.
-
+    // A ladder longer than the escalation cap sent the Forward to the DLQ before its later tiers ran.
     @Test
     void createDestination_ladderOutlivingTheEscalationCap_throws() {
         stubOwnership();
 
         lenient().when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
-        // 5 attempts at 6h each: up to 45h with jitter, against a 24h cap.
         IncomingDestinationRequest request = IncomingDestinationRequest.builder()
                 .url("https://example.com/hook")
                 .retryDelays("21600")

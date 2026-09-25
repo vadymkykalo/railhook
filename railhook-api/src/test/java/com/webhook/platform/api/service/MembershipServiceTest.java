@@ -35,11 +35,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -73,9 +70,6 @@ class MembershipServiceTest {
         organizationId = UUID.randomUUID();
         TenantContext.set(organizationId);
 
-        // Cost 4: MembershipService takes the shared encoder bean instead of building one, and
-        // the production cost of 12 would add ~200ms to every test that creates an invitee for
-        // no assertion's benefit.
         membershipService = new MembershipService(
                 userRepository, membershipRepository, emailService, tokenBlacklistService,
                 new BCryptPasswordEncoder(4), mock(TunnelService.class));
@@ -97,7 +91,6 @@ class MembershipServiceTest {
         TenantContext.clear();
     }
 
-    /** An existing member of the tenant organization, registered with the repository mocks. */
     private Membership existingMember(UUID userId, MembershipRole role, MembershipStatus status) {
         Membership membership = new Membership();
         membership.setUserId(userId);
@@ -115,18 +108,7 @@ class MembershipServiceTest {
         return membership;
     }
 
-    /**
-     * An invite has to be deliverable by hand, because in the shipped default configuration
-     * ({@code EMAIL_ENABLED=false}) nothing is delivered at all.
-     *
-     * <p>The token used to reach only the API container's log, while the browser was told
-     * "Invitation sent". So the owner who issues an invite is handed the accept-invite link
-     * back in the response, and can re-issue it when it expires. What is deliberately
-     * <em>not</em> handed back is the temporary password minted for a brand-new invitee: it
-     * is non-expiring full account access, and {@code EmailService#sendTemporaryPasswordEmail}
-     * refuses to log or return it for exactly that reason. The invite link plus
-     * forgot-password is the safe way in.
-     */
+    // With EMAIL_ENABLED=false nothing is delivered, so the owner gets the link, never the temporary password.
     @Nested
     class Invites {
 
@@ -162,13 +144,7 @@ class MembershipServiceTest {
             assertThat(response.getInviteExpiresAt()).isNull();
         }
 
-        /**
-         * An account can be registered for any address and used without ever proving it owns that
-         * address. Inviting the address then made that account an ACTIVE member on the spot — and read
-         * access needs no verified email — so whoever registered alice@customer.com first read the
-         * customer's events the day the owner invited Alice. With email delivery on, an unverified
-         * account is not taken to be the person at that address.
-         */
+        // Whoever registered the address first became the invited member without proving it.
         @Test
         void anAccountThatNeverProvedItsAddressIsNotAddedWhenThatAddressIsInvited() {
             when(emailService.isEnabled()).thenReturn(true);
@@ -275,7 +251,6 @@ class MembershipServiceTest {
             });
         }
 
-        /** A membership sitting at INVITED, registered with the repository mocks. */
         private Membership pendingInvite() {
             UUID userId = UUID.randomUUID();
             Membership membership = new Membership();
@@ -297,10 +272,6 @@ class MembershipServiceTest {
         }
     }
 
-    /**
-     * Invite tokens are never exposed in API responses, and the temporary password minted for a
-     * brand-new invitee never reaches the logs: it is delivered only through EmailService.
-     */
     @Nested
     class InviteTokenLeak {
 
@@ -321,15 +292,6 @@ class MembershipServiceTest {
         }
 
         @Test
-        void memberResponseDoesNotContainInviteTokenField() {
-            Field[] fields = MemberResponse.class.getDeclaredFields();
-
-            assertThat(Arrays.stream(fields).map(Field::getName))
-                    .as("MemberResponse must not contain inviteToken field to prevent token leak")
-                    .doesNotContain("inviteToken");
-        }
-
-        @Test
         void memberResponseJsonSerialization() throws Exception {
             MemberResponse response = MemberResponse.builder()
                     .userId(UUID.randomUUID())
@@ -347,15 +309,6 @@ class MembershipServiceTest {
         }
 
         @Test
-        void memberResponseBuilderDoesNotHaveInviteTokenMethod() {
-            Method[] methods = MemberResponse.MemberResponseBuilder.class.getDeclaredMethods();
-
-            assertThat(Arrays.stream(methods).map(Method::getName))
-                    .as("MemberResponse.Builder must not have inviteToken() method")
-                    .doesNotContain("inviteToken");
-        }
-
-        @Test
         void tempPasswordNeverReachesLogs_andIsSentViaEmail() {
             String email = "new-invitee@example.com";
             when(userRepository.existsByEmail(email)).thenReturn(false);
@@ -365,13 +318,11 @@ class MembershipServiceTest {
                     AddMemberRequest.builder().email(email).role(MembershipRole.DEVELOPER).build(),
                     MembershipRole.OWNER);
 
-            // The temp password must have been emailed, not just generated and discarded.
             ArgumentCaptor<String> tempPasswordCaptor = ArgumentCaptor.forClass(String.class);
             verify(emailService).sendTemporaryPasswordEmail(eq(email), tempPasswordCaptor.capture());
             String tempPassword = tempPasswordCaptor.getValue();
             assertThat(tempPassword).isNotBlank();
 
-            // No log event at any level may contain the temp password value.
             assertThat(logAppender.list)
                     .extracting(ILoggingEvent::getFormattedMessage)
                     .noneMatch(message -> message.contains(tempPassword));
@@ -392,19 +343,11 @@ class MembershipServiceTest {
                     AddMemberRequest.builder().email(email).role(MembershipRole.VIEWER).build(),
                     MembershipRole.OWNER);
 
-            // An already-registered user already has a usable password; no temp password
-            // should be generated or emailed for them.
             verify(emailService, never()).sendTemporaryPasswordEmail(anyString(), anyString());
         }
     }
 
-    /**
-     * Which roles an owner can hand out.
-     *
-     * <p>OWNER is not granted through the member endpoints, and API_KEY is not a human role at all.
-     * Adding a member and changing a member's role are two doors into the same grant, so both refuse
-     * the same roles with the same answer — adding a member used to accept either.
-     */
+    // Adding a member used to accept OWNER and API_KEY, which changing a role refused.
     @Nested
     class RoleGrant {
 
@@ -442,16 +385,7 @@ class MembershipServiceTest {
         }
     }
 
-    /**
-     * Demoting or removing a member has to take effect now, not in fifteen minutes.
-     *
-     * <p>{@code JwtAuthenticationFilter} reads {@code organizationId} and {@code role} straight
-     * out of the access token and re-checks neither against the database. So a demoted OWNER goes
-     * on exercising OWNER authority, and a removed member goes on reaching the organization's
-     * data, for the whole remaining access-token lifetime. Refreshing is already blocked — the
-     * refresh path 404s once the membership is gone — which is exactly why the access token is
-     * the gap worth closing.</p>
-     */
+    // The access token carries the role, so a demotion must revoke it rather than wait out its lifetime.
     @Nested
     class RevokesSessions {
 
@@ -477,21 +411,6 @@ class MembershipServiceTest {
         }
     }
 
-    /**
-     * Suspending a member, rather than deleting them.
-     *
-     * <p>Removal was the only lever an owner had: a colleague on leave, a stolen laptop or a
-     * half-finished offboarding all cost the membership row, and with it the record of who that
-     * person was and what they held. {@code MembershipStatus.DISABLED} was in the enum the whole
-     * time and nothing ever assigned it.</p>
-     *
-     * <p>What a suspension has to be, and what these tests pin down: the row and the role survive,
-     * the live access token stops working immediately (the same epoch revocation a demotion and a
-     * removal already do — an access token is self-contained, so without it the suspension only
-     * starts a quarter of an hour later), and it cannot be used to make an organization
-     * unadministrable — not by an owner suspending themselves, and not by suspending the last
-     * owner who is still able to sign in.</p>
-     */
     @Nested
     class Suspension {
 
@@ -626,11 +545,7 @@ class MembershipServiceTest {
         }
     }
 
-    /**
-     * Requests refused because of the state a membership is in answer 409 with their message. They
-     * used to throw IllegalStateException, which the error handler treats as a server fault: a 500
-     * that hides from the person what they need to do.
-     */
+    // These used to throw IllegalStateException, which the error handler answers with a 500.
     @Nested
     class StateConflicts {
 

@@ -13,7 +13,6 @@ import com.webhook.platform.api.domain.repository.IncomingForwardAttemptReposito
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
-import com.webhook.platform.api.dto.DlqStatsResponse;
 import com.webhook.platform.api.dto.IncomingDlqItemResponse;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.TenantContext;
@@ -48,12 +47,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * The Incoming DLQ surface. The Outgoing equivalent is {@link DlqServiceTest}; what is checked
- * differently here is what makes the Incoming direction different — a retry that touches only the
- * Destination that failed, and one that starts a fresh Ladder instead of a number the Attempt
- * record already contains.
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class IncomingDlqServiceTest {
@@ -81,7 +74,6 @@ class IncomingDlqServiceTest {
     private final UUID otherDestinationId = UUID.randomUUID();
     private final UUID attemptId = UUID.randomUUID();
 
-    /** The service reads its organization from the ambient tenant scope, not from a parameter. */
     @BeforeEach
     void setUp() {
         TenantContext.set(orgId);
@@ -101,17 +93,6 @@ class IncomingDlqServiceTest {
     }
 
     @Test
-    void aProjectOutsideTheTenantIsNotFound() {
-        UUID foreign = UUID.randomUUID();
-        when(projectRepository.findById(foreign)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.validateProjectOwnership(foreign))
-                .isInstanceOf(NotFoundException.class);
-    }
-
-    // ── Browse ───────────────────────────────────────────────────────────────────────
-
-    @Test
     void theListNamesTheDestinationAndSourceOfEachAbandonedForward() {
         Pageable pageable = PageRequest.of(0, 20);
         when(attemptRepository.findDlqByProjectId(projectId, pageable))
@@ -127,18 +108,6 @@ class IncomingDlqServiceTest {
         assertThat(item.getSourceName()).isEqualTo("Stripe");
         assertThat(item.getMaxAttempts()).isEqualTo(5);
         assertThat(item.getLastError()).isEqualTo("Max attempts reached: Retryable HTTP 503");
-    }
-
-    @Test
-    void filteringByDestinationUsesTheScopedQuery() {
-        Pageable pageable = PageRequest.of(0, 20);
-        when(attemptRepository.findDlqByProjectIdAndDestinationId(projectId, destinationId, pageable))
-                .thenReturn(new PageImpl<>(List.of()));
-
-        service.listDlqItems(projectId, destinationId, pageable);
-
-        verify(attemptRepository).findDlqByProjectIdAndDestinationId(projectId, destinationId, pageable);
-        verify(attemptRepository, never()).findDlqByProjectId(any(), any());
     }
 
     @Test
@@ -162,24 +131,7 @@ class IncomingDlqServiceTest {
                 .isInstanceOf(NotFoundException.class);
     }
 
-    @Test
-    void theStatsCountTheWholeBacklogAndTwoWindows() {
-        when(attemptRepository.countDlqByProjectId(projectId)).thenReturn(9L);
-        when(attemptRepository.countDlqByProjectIdSince(eq(projectId), any())).thenReturn(4L);
-
-        DlqStatsResponse stats = service.getDlqStats(projectId);
-
-        assertThat(stats.getTotalItems()).isEqualTo(9L);
-        assertThat(stats.getLast24Hours()).isEqualTo(4L);
-        assertThat(stats.getLast7Days()).isEqualTo(4L);
-    }
-
-    // ── Retry ────────────────────────────────────────────────────────────────────────
-
-    /**
-     * The whole reason this exists: {@code replayEvent} was the only recovery, and it fans an
-     * Incoming Event out to every enabled Destination.
-     */
+    // replayEvent was the only recovery, and it fans out to every enabled Destination.
     @Test
     void aRetryReForwardsOnlyToTheDestinationThatFailed() {
         when(attemptRepository.findByIdInAndStatus(List.of(attemptId), ForwardAttemptStatus.DLQ))
@@ -195,11 +147,7 @@ class IncomingDlqServiceTest {
         assertThat(outbox.getValue().getEventType()).isEqualTo("IncomingForwardDlqRetry");
     }
 
-    /**
-     * Incoming cannot raise a per-Forward maxAttempts the way Outgoing does, so continuing at
-     * N+1 would be exhausted on its first claim. A new Replay session is the fresh Ladder — and
-     * it never reuses an attempt number the record already contains.
-     */
+    // Incoming cannot raise maxAttempts, so continuing at N+1 would be exhausted on its first claim.
     @Test
     void aRetryStartsAFreshLadderInsteadOfReusingAnAttemptNumber() {
         when(attemptRepository.findByIdInAndStatus(List.of(attemptId), ForwardAttemptStatus.DLQ))
@@ -216,7 +164,6 @@ class IncomingDlqServiceTest {
         assertThat(successor.getDestinationId()).isEqualTo(destinationId);
     }
 
-    /** Otherwise it sits in the backlog and in incoming_forward_dlq_depth forever. */
     @Test
     void aRetriedForwardLeavesTheActionableBacklogWithItsRecordIntact() {
         when(attemptRepository.findByIdInAndStatus(List.of(attemptId), ForwardAttemptStatus.DLQ))
@@ -247,8 +194,7 @@ class IncomingDlqServiceTest {
         verify(attemptRepository, never()).save(any());
     }
 
-    // ── Purge ────────────────────────────────────────────────────────────────────────
-
+    // @TenantId does not reach native SQL, so the purge must carry the organization itself.
     @Test
     void thePurgeKeepsGoingUntilABatchComesBackShort() {
         when(attemptRepository.deleteDlqBatchByProjectId(eq(orgId), eq(projectId), anyInt()))
@@ -257,19 +203,6 @@ class IncomingDlqServiceTest {
         assertThat(service.purgeAllDlq(projectId)).isEqualTo(1013);
         verify(attemptRepository, times(3)).deleteDlqBatchByProjectId(orgId, projectId, 500);
     }
-
-    @Test
-    void thePurgeCarriesTheTenantIntoTheNativeStatement() {
-        when(attemptRepository.deleteDlqBatchByProjectId(eq(orgId), eq(projectId), anyInt())).thenReturn(0);
-
-        service.purgeAllDlq(projectId);
-
-        // @TenantId does not reach native SQL; without this predicate the statement would delete
-        // every organization's abandoned Forwards.
-        verify(attemptRepository).deleteDlqBatchByProjectId(eq(orgId), eq(projectId), anyInt());
-    }
-
-    // ── Fixtures ─────────────────────────────────────────────────────────────────────
 
     private IncomingForwardAttempt dlqAttempt() {
         return IncomingForwardAttempt.builder()

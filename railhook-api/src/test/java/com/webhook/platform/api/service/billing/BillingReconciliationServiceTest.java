@@ -7,6 +7,8 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -62,8 +64,6 @@ class BillingReconciliationServiceTest {
         when(entitlementService.isBillingEnabled()).thenReturn(true);
     }
 
-    // ── Skip conditions ─────────────────────────────────────────────
-
     @Test
     void reconcile_skipsWhenBillingDisabled() {
         when(entitlementService.isBillingEnabled()).thenReturn(false);
@@ -73,7 +73,6 @@ class BillingReconciliationServiceTest {
 
     @Test
     void reconcile_skipsNonManagedProviders() {
-        // wayforpay has MERCHANT_RECURRING, not MANAGED_SUBSCRIPTIONS — should be skipped
         when(subscriptionRepository.findReconcilable("stripe")).thenReturn(List.of());
 
         service.reconcile();
@@ -82,87 +81,31 @@ class BillingReconciliationServiceTest {
         verify(subscriptionRepository, never()).findReconcilable("wayforpay");
     }
 
-    @Test
-    void reconcile_skipsWhenNoSubscriptions() {
-        when(subscriptionRepository.findReconcilable("stripe")).thenReturn(List.of());
-        service.reconcile();
-        verifyNoInteractions(lifecycleService);
-    }
-
-    // ── Status drift ────────────────────────────────────────────────
-
-    @Test
-    void reconcile_fixesStatusDrift_activeToActive_renews() {
-        BillingSubscription sub = buildSub(SubscriptionStatus.ACTIVE, "sub_ext_1");
+    @ParameterizedTest
+    @CsvSource({
+            "PAST_DUE, active,   activate",
+            "ACTIVE,   past_due, markPastDue",
+            "ACTIVE,   canceled, cancel",
+            "ACTIVE,   unpaid,   suspend",
+    })
+    void reconcile_fixesStatusDrift(SubscriptionStatus local, String external, String expected) {
+        BillingSubscription sub = buildSub(local, "sub_ext_1");
         when(subscriptionRepository.findReconcilable("stripe")).thenReturn(List.of(sub));
-
-        Instant newStart = Instant.now();
-        Instant newEnd = newStart.plus(30, ChronoUnit.DAYS);
-        // External says ACTIVE but with newer period — no status drift, just period drift
-        stripeProvider.setExternalState(new BillingProvider.ExternalSubscriptionState(
-                "sub_ext_1", "active", "starter", newStart, newEnd, false));
-
-        service.reconcile();
-
-        // No status change (both ACTIVE), but period is updated
-        verify(lifecycleService, never()).renew(any(), any(), any());
-    }
-
-    @Test
-    void reconcile_fixesStatusDrift_pastDueToActive() {
-        BillingSubscription sub = buildSub(SubscriptionStatus.PAST_DUE, "sub_ext_1");
-        when(subscriptionRepository.findReconcilable("stripe")).thenReturn(List.of(sub));
-
         Instant start = Instant.now();
         Instant end = start.plus(30, ChronoUnit.DAYS);
         stripeProvider.setExternalState(new BillingProvider.ExternalSubscriptionState(
-                "sub_ext_1", "active", "starter", start, end, false));
+                "sub_ext_1", external, "starter", start, end, false));
 
         service.reconcile();
 
-        verify(lifecycleService).activate(sub.getId(), start, end);
+        switch (expected) {
+            case "activate" -> verify(lifecycleService).activate(sub.getId(), start, end);
+            case "markPastDue" -> verify(lifecycleService).markPastDue(eq(sub.getId()), anyString());
+            case "cancel" -> verify(lifecycleService).cancel(eq(sub.getId()), anyString());
+            case "suspend" -> verify(lifecycleService).suspend(sub.getId());
+            default -> throw new IllegalArgumentException(expected);
+        }
     }
-
-    @Test
-    void reconcile_fixesStatusDrift_activeToPastDue() {
-        BillingSubscription sub = buildSub(SubscriptionStatus.ACTIVE, "sub_ext_1");
-        when(subscriptionRepository.findReconcilable("stripe")).thenReturn(List.of(sub));
-
-        stripeProvider.setExternalState(new BillingProvider.ExternalSubscriptionState(
-                "sub_ext_1", "past_due", "starter", null, null, false));
-
-        service.reconcile();
-
-        verify(lifecycleService).markPastDue(eq(sub.getId()), contains("Reconciliation"));
-    }
-
-    @Test
-    void reconcile_fixesStatusDrift_activeToCancelled() {
-        BillingSubscription sub = buildSub(SubscriptionStatus.ACTIVE, "sub_ext_1");
-        when(subscriptionRepository.findReconcilable("stripe")).thenReturn(List.of(sub));
-
-        stripeProvider.setExternalState(new BillingProvider.ExternalSubscriptionState(
-                "sub_ext_1", "canceled", "starter", null, null, false));
-
-        service.reconcile();
-
-        verify(lifecycleService).cancel(eq(sub.getId()), contains("Reconciliation"));
-    }
-
-    @Test
-    void reconcile_fixesStatusDrift_activeToSuspended() {
-        BillingSubscription sub = buildSub(SubscriptionStatus.ACTIVE, "sub_ext_1");
-        when(subscriptionRepository.findReconcilable("stripe")).thenReturn(List.of(sub));
-
-        stripeProvider.setExternalState(new BillingProvider.ExternalSubscriptionState(
-                "sub_ext_1", "unpaid", "starter", null, null, false));
-
-        service.reconcile();
-
-        verify(lifecycleService).suspend(sub.getId());
-    }
-
-    // ── Period drift ────────────────────────────────────────────────
 
     @Test
     void reconcile_fixesPeriodDrift() {
@@ -179,7 +122,6 @@ class BillingReconciliationServiceTest {
 
         service.reconcile();
 
-        // Period updated
         assertThat(sub.getCurrentPeriodStart()).isEqualTo(newStart);
         assertThat(sub.getCurrentPeriodEnd()).isEqualTo(newEnd);
         verify(subscriptionRepository).save(sub);
@@ -199,11 +141,8 @@ class BillingReconciliationServiceTest {
 
         service.reconcile();
 
-        // Period NOT updated
         assertThat(sub.getCurrentPeriodEnd()).isEqualTo(currentEnd);
     }
-
-    // ── Plan drift ──────────────────────────────────────────────────
 
     @Test
     void reconcile_fixesPlanDrift() {
@@ -232,8 +171,6 @@ class BillingReconciliationServiceTest {
         verify(lifecycleService, never()).changePlan(any(), any());
     }
 
-    // ── External state null ─────────────────────────────────────────
-
     @Test
     void reconcile_handlesNullExternalState() {
         BillingSubscription sub = buildSub(SubscriptionStatus.ACTIVE, "sub_ext_1");
@@ -245,25 +182,19 @@ class BillingReconciliationServiceTest {
         verifyNoInteractions(lifecycleService);
     }
 
-    // ── Error handling ──────────────────────────────────────────────
-
     @Test
     void reconcile_continuesOnErrorForIndividualSub() {
         BillingSubscription sub1 = buildSub(SubscriptionStatus.ACTIVE, "sub_1");
         BillingSubscription sub2 = buildSub(SubscriptionStatus.ACTIVE, "sub_2");
         when(subscriptionRepository.findReconcilable("stripe")).thenReturn(List.of(sub1, sub2));
-
-        // sub1 throws, sub2 should still be processed
         stripeProvider.setThrowForSubId("sub_1");
         stripeProvider.setExternalState(new BillingProvider.ExternalSubscriptionState(
-                "sub_2", "active", "starter", null, null, false));
+                "sub_2", "canceled", "starter", null, null, false));
 
         service.reconcile();
 
-        // Should not blow up, and second sub was still checked
+        verify(lifecycleService).cancel(eq(sub2.getId()), anyString());
     }
-
-    // ── Helpers ─────────────────────────────────────────────────────
 
     private BillingSubscription buildSub(SubscriptionStatus status, String extSubId) {
         return BillingSubscription.builder()

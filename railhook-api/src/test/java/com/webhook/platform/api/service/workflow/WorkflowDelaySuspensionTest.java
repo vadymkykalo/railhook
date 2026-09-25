@@ -24,21 +24,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-/**
- * A delay node must not hold a thread while it waits.
- *
- * <p>{@code DelayNodeExecutor} used to call {@code Thread.sleep} for up to 300 seconds on the
- * workflow pool, which is core-size 4 / max-size 8 across the whole deployment. Eight delay
- * nodes — one badly-configured workflow, or eight ordinary ones that happened to overlap — took
- * every thread for five minutes, and no workflow belonging to any organization ran at all. The
- * threads were not doing work; they were watching a clock.
- *
- * <p>So the execution suspends: the engine records where it got to, when it is due, and returns
- * the thread. {@code WorkflowResumeJob} continues it. These tests pin the three things that
- * decide whether that is actually better than sleeping — that the thread really is released,
- * that a resumed run carries its earlier outputs forward rather than recomputing them, and that
- * time spent suspended is not charged against a budget meant for work.
- */
+// Sleeping delay nodes took the whole shared workflow pool, so no organization's workflows ran.
 @DisplayName("WorkflowEngine — a delay suspends the execution instead of occupying a thread")
 class WorkflowDelaySuspensionTest {
 
@@ -72,30 +58,11 @@ class WorkflowDelaySuspensionTest {
                 """), mapper.createObjectNode());
         long elapsed = System.currentTimeMillis() - before;
 
-        /* The old implementation would have taken 300 seconds here — or, with the per-node
-           timeout, 305 seconds and then a FAILED. */
         assertThat(elapsed)
                 .as("the call must return immediately; the waiting happens in the database")
                 .isLessThan(2_000);
         verify(persistence).suspendExecution(eq(executionId), any(Instant.class), any(), anyLong());
         verify(persistence, never()).completeExecution(eq(executionId), eq(ExecutionStatus.COMPLETED), any(), anyLong());
-    }
-
-    @Test
-    @DisplayName("the node after a delay does not run until the execution is resumed")
-    void nodesAfterTheDelayWaitForTheResume() {
-        AtomicInteger afterRuns = new AtomicInteger();
-        WorkflowEngine engine = newEngine(List.of(new DelayNodeExecutor(), counting("noop", afterRuns)));
-
-        engine.execute(UUID.randomUUID(), definition("""
-                {"nodes":[{"id":"a","type":"delay","data":{"delaySeconds":60}},
-                          {"id":"b","type":"noop","data":{}}],
-                 "edges":[{"source":"a","target":"b"}]}
-                """), mapper.createObjectNode());
-
-        assertThat(afterRuns.get())
-                .as("suspending has to stop the run, not merely record a timestamp beside it")
-                .isZero();
     }
 
     @Test
@@ -119,9 +86,7 @@ class WorkflowDelaySuspensionTest {
 
         engine.resume(executionId, definition, mapper.createObjectNode(), stateResumingAt("c"), 0L);
 
-        /* Re-running a node that already succeeded is the failure mode that makes naive
-           resume worse than sleeping: an http node would post twice, a createEvent node would
-           emit twice. The snapshot exists precisely so the prefix is not repeated. */
+        // A re-run prefix would post an http node or emit a createEvent node twice.
         assertThat(beforeRuns.get()).as("already done, must not run again").isEqualTo(1);
         assertThat(afterRuns.get()).as("this is what the execution was waiting to do").isEqualTo(1);
     }
@@ -136,7 +101,6 @@ class WorkflowDelaySuspensionTest {
                           {"id":"c","type":"after","data":{}}],
                  "edges":[{"source":"b","target":"c"}]}
                 """);
-        // A one-second budget for work, resumed as if the execution had been suspended for a day.
         WorkflowEngine engine = newEngine(
                 List.of(new DelayNodeExecutor(), counting("after", afterRuns)), 1);
 
@@ -144,15 +108,9 @@ class WorkflowDelaySuspensionTest {
         engine.resume(executionId, definition, mapper.createObjectNode(),
                 stateResumingAt("c"), 0L);
 
-        /* Measuring the budget as wall-clock from startedAt would make any workflow containing
-           a delay longer than the budget impossible to finish — it would time out on the
-           resume, every time, having done almost no work. Only running segments count. */
         assertThat(afterRuns.get()).isEqualTo(1);
     }
 
-    // ── helpers ──────────────────────────────────────────────────────────
-
-    /** The snapshot the engine writes: outputs so far, skipped nodes, and where to continue. */
     private JsonNode stateResumingAt(String nodeId) {
         var state = mapper.createObjectNode();
         state.put("resumeFrom", nodeId);

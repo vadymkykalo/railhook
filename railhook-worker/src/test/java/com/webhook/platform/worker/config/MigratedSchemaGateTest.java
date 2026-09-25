@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -24,15 +25,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * The worker does not validate its entities against a schema the API has not finished migrating.
- *
- * <p>Only the API runs Flyway; the worker starts with {@code ddl-auto: validate}. Started beside
- * or before an API that is still migrating — a fresh install, {@code railhook start} after a tag
- * change, a Helm upgrade that rolls both Deployments at once — it validated the old schema and
- * exited ("Schema validation: missing column [ladder_resumed_at]", the 2.20.7 deploy), and only a
- * restart brought it back.
- */
+/** A worker started beside a still-migrating API exited on schema validation (the 2.20.7 deploy). */
 class MigratedSchemaGateTest {
 
     private static final Path API_MIGRATIONS = Paths.get("..", "railhook-api", "src", "main", "resources", "db", "migration");
@@ -90,7 +83,7 @@ class MigratedSchemaGateTest {
 
         gate("076", () -> {
             if (calls.getAndIncrement() == 0) {
-                throw new java.sql.SQLException("Connection refused");
+                throw new SQLException("Connection refused");
             }
             return Optional.of("076");
         }, time).await();

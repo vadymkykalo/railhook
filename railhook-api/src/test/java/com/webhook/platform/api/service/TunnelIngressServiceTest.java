@@ -24,9 +24,7 @@ class TunnelIngressServiceTest {
             mock(TunnelRequestLogRepository.class), mock(TunnelBandwidthService.class),
             new SimpleMeterRegistry(), Runnable::run, mock(SuspensionCheck.class));
 
-    // A deleted tunnel whose socket has not gone yet — or whose close never reached the owning
-    // instance — must not keep carrying traffic: it no longer counts towards the plan's tunnel
-    // limit, and its bandwidth can no longer be metered.
+    // A deleted tunnel no longer counts toward the plan limit, so its lingering socket must not carry traffic.
     @Test
     void aTunnelWhoseSessionIsNoLongerActiveIsRefusedEvenWhileItsSocketIsUp() {
         when(coordinator.isActiveInCluster("tun-deleted")).thenReturn(true);

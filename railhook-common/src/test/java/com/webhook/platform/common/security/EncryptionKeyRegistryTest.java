@@ -4,6 +4,8 @@ import com.webhook.platform.common.util.CryptoUtils;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -84,31 +86,16 @@ class EncryptionKeyRegistryTest {
             assertEquals(2, reg.getVersions().size());
         }
 
-        @Test
-        void noKeys_throwsIllegalState() {
-            IllegalStateException ex = assertThrows(IllegalStateException.class,
-                    () -> buildRegistry("", "", 0, SALT));
-            assertTrue(ex.getMessage().contains("No encryption key configured"));
-        }
-
-        @Test
-        void invalidMultiKeyFormat_throws() {
-            IllegalStateException ex = assertThrows(IllegalStateException.class,
-                    () -> buildRegistry("", "badformat", 0, SALT));
-            assertTrue(ex.getMessage().contains("Invalid encryption key entry"));
-        }
-
-        @Test
-        void activeVersionNotInKeys_throws() {
-            IllegalStateException ex = assertThrows(IllegalStateException.class,
-                    () -> buildRegistry("", "1:" + KEY_V1, 5, SALT));
-            assertTrue(ex.getMessage().contains("not found in webhook.encryption-keys"));
-        }
-
-        @Test
-        void emptyKeyValue_throws() {
-            assertThrows(IllegalStateException.class,
-                    () -> buildRegistry("", "1:", 0, SALT));
+        @ParameterizedTest
+        @CsvSource({
+                "'', 0",
+                "badformat, 0",
+                "1:" + KEY_V1 + ", 5",
+                "'1:', 0",
+        })
+        @DisplayName("no key, a malformed entry, an empty key or an unknown active version refuses to start")
+        void misconfiguredKeysRefuseToStart(String multiKeys, int activeVersion) {
+            assertThrows(IllegalStateException.class, () -> buildRegistry("", multiKeys, activeVersion, SALT));
         }
     }
 
@@ -189,7 +176,7 @@ class EncryptionKeyRegistryTest {
         void fallback_triesOtherVersions_whenSpecifiedFails() throws Exception {
             EncryptionKeyRegistry reg = buildRegistry("", "1:" + KEY_V1 + ",2:" + KEY_V2, 2, SALT);
 
-            // Encrypted with v2 but caller says version=1 (wrong metadata)
+            // Encrypted with v2 but the stored metadata says v1.
             CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret("data", KEY_V2, SALT, 2);
 
             String decrypted = reg.decryptWithFallback(encrypted.getCiphertext(), encrypted.getIv(), 1);
@@ -210,7 +197,6 @@ class EncryptionKeyRegistryTest {
         void fallback_allFail_throws() throws Exception {
             EncryptionKeyRegistry reg = buildRegistry(KEY_V1, "", 0, SALT);
 
-            // Encrypted with a completely different key
             CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret("data", KEY_V2, SALT, 1);
 
             RuntimeException ex = assertThrows(RuntimeException.class,
@@ -224,14 +210,9 @@ class EncryptionKeyRegistryTest {
     class NeedsReEncryption {
 
         @Test
-        void sameVersion_noReEncryption() throws Exception {
+        void onlyAnOlderVersionNeedsReEncryption() throws Exception {
             EncryptionKeyRegistry reg = buildRegistry("", "1:" + KEY_V1 + ",2:" + KEY_V2, 2, SALT);
             assertFalse(reg.needsReEncryption(2));
-        }
-
-        @Test
-        void oldVersion_needsReEncryption() throws Exception {
-            EncryptionKeyRegistry reg = buildRegistry("", "1:" + KEY_V1 + ",2:" + KEY_V2, 2, SALT);
             assertTrue(reg.needsReEncryption(1));
         }
     }
@@ -241,16 +222,11 @@ class EncryptionKeyRegistryTest {
     class HasVersion {
 
         @Test
-        void existingVersion_returnsTrue() throws Exception {
+        void knowsExactlyTheConfiguredVersions() throws Exception {
             EncryptionKeyRegistry reg = buildRegistry("", "1:" + KEY_V1 + ",2:" + KEY_V2, 2, SALT);
             assertTrue(reg.hasVersion(1));
             assertTrue(reg.hasVersion(2));
-        }
-
-        @Test
-        void nonExistingVersion_returnsFalse() throws Exception {
-            EncryptionKeyRegistry reg = buildRegistry(KEY_V1, "", 0, SALT);
-            assertFalse(reg.hasVersion(99));
+            assertFalse(buildRegistry(KEY_V1, "", 0, SALT).hasVersion(99));
         }
     }
 
@@ -259,20 +235,16 @@ class EncryptionKeyRegistryTest {
     void reEncryption_roundTrip() throws Exception {
         EncryptionKeyRegistry reg = buildRegistry("", "1:" + KEY_V1 + ",2:" + KEY_V2, 2, SALT);
 
-        // Simulate old data encrypted with v1
         CryptoUtils.EncryptedData oldData = CryptoUtils.encryptSecret("sensitive", KEY_V1, SALT, 1);
 
-        // Decrypt with v1 then re-encrypt with active (v2)
         String plaintext = reg.decryptWithFallback(oldData.getCiphertext(), oldData.getIv(), 1);
         CryptoUtils.EncryptedData newData = reg.encrypt(plaintext);
 
         assertEquals(2, newData.getKeyVersion());
 
-        // Verify new data decrypts correctly with v2
         String decrypted = reg.decrypt(newData.getCiphertext(), newData.getIv(), 2);
         assertEquals("sensitive", decrypted);
 
-        // Verify old data no longer decrypts with v2 key directly
         assertThrows(RuntimeException.class, () ->
                 CryptoUtils.decryptSecret(oldData.getCiphertext(), oldData.getIv(), KEY_V2, SALT));
     }

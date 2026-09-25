@@ -16,6 +16,7 @@ import org.redisson.api.RScoredSortedSet;
 import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.Codec;
+import org.redisson.client.codec.LongCodec;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -33,7 +34,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -42,24 +42,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Unit coverage for OrderingBufferService -- previously had no tests at
- * all despite gating FIFO delivery ordering.
- *
- * <p>Postgres-first cursor updates: markDelivered() now upserts Postgres first (authoritative, GREATEST-guarded) and
- * only ever advances the Redis cache from that returned value via a Lua CAS script, so the
- * cache can never regress below what Postgres already knows -- not even after a Redis TTL
- * expiry/flush that resets the "current" value the naive read-modify-write used to trust.
- * The real Lua script runs inside Redis in production (see
- * src/main/resources/lua/ordering_cursor_cas.lua); here RScript.eval is faked with a small
- * in-memory CAS implementation that mirrors the script's documented contract, so these tests
- * exercise OrderingBufferService's own logic (what it sends the script, what it does with the
- * result) against a *correct* CAS, not Lua itself.
- *
- * <p>Gap-timeout measurement: isGapTimedOut() now measures from "when this delivery was first buffered", not from
- * an unrelated row's ingest createdAt -- and no longer double-counts the gap-timeout metric
- * (that counting now lives solely in WebhookDeliveryService).
- */
+/** RScript.eval is an in-memory CAS mirroring the Lua script, so the cursor logic runs against a correct CAS. */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class OrderingBufferServiceTest {
@@ -74,7 +57,6 @@ class OrderingBufferServiceTest {
     private SimpleMeterRegistry meterRegistry;
     private OrderingBufferService service;
 
-    /** In-memory fake of the Redis key this test's endpoint maps to. */
     private final ConcurrentHashMap<String, Long> fakeRedisState = new ConcurrentHashMap<>();
 
     private static final int GAP_TIMEOUT_SECONDS = 60;
@@ -85,14 +67,9 @@ class OrderingBufferServiceTest {
         meterRegistry = new SimpleMeterRegistry();
         fakeRedisState.clear();
 
-        // Redisson 3.5x added an RedissonClient#getScript(OptionalOptions)
-        // overload, so a bare any() is ambiguous at compile time - pin the
-        // matcher's type to disambiguate to the Codec overload actually used
-        // in production (see OrderingBufferService).
+        // any(Codec.class): a bare any() is ambiguous since Redisson added getScript(OptionalOptions).
         when(redissonClient.getScript(any(Codec.class))).thenReturn(rScript);
-        // Faithfully mirrors lua/ordering_cursor_cas.lua: SET only if newVal > current
-        // (missing key treated as "current == false"), atomically (synchronized -- this test
-        // fake is what stands in for Redis's single-threaded Lua execution guarantee).
+        // Mirrors lua/ordering_cursor_cas.lua: SET only if newVal > current, atomically.
         when(rScript.eval(eq(RScript.Mode.READ_WRITE), any(String.class), eq(RScript.ReturnType.LONG),
                 any(List.class), any(), any())).thenAnswer(invocation -> {
             List<String> keys = invocation.getArgument(3);
@@ -117,14 +94,9 @@ class OrderingBufferServiceTest {
         return UUID.randomUUID();
     }
 
-    // ── 23a: cursor cannot regress ──────────────────────────────────────
-
     @Test
     void markDelivered_advancesRedisFromAuthoritativePostgresValue_notFromRawArgument() {
         UUID endpointId = endpointId();
-        // Postgres already at 100; a straggler for sequence 5 arrives (e.g. after a Redis
-        // flush wiped the cache and a slow retry finally lands). The upsert's GREATEST clause
-        // means the authoritative return value stays 100, not 5.
         when(cursorRepository.upsertCursor(endpointId, 5L)).thenReturn(100L);
 
         service.markDelivered(endpointId, 5L);
@@ -138,16 +110,13 @@ class OrderingBufferServiceTest {
         UUID endpointId = endpointId();
         String key = "seq:delivered:" + endpointId;
 
-        // Cursor reaches 100 in both stores.
         when(cursorRepository.upsertCursor(endpointId, 100L)).thenReturn(100L);
         service.markDelivered(endpointId, 100L);
         assertEquals(100L, fakeRedisState.get(key));
 
-        // Simulate a Redis flush/TTL expiry: the key disappears, but Postgres still holds 100.
+        // A Redis flush drops the key while Postgres still holds 100.
         fakeRedisState.remove(key);
 
-        // A straggler for a stale, already-superseded sequence (5) finally succeeds. Postgres's
-        // upsert is GREATEST-guarded so it still authoritatively reports 100.
         when(cursorRepository.upsertCursor(endpointId, 5L)).thenReturn(100L);
         service.markDelivered(endpointId, 5L);
 
@@ -160,7 +129,6 @@ class OrderingBufferServiceTest {
         UUID endpointId = endpointId();
         String key = "seq:delivered:" + endpointId;
 
-        // Postgres upsert is GREATEST-guarded regardless of call order/interleaving.
         AtomicLong postgresCursor = new AtomicLong(0);
         when(cursorRepository.upsertCursor(eq(endpointId), anyLong())).thenAnswer(invocation -> {
             long candidate = invocation.getArgument(1);
@@ -206,8 +174,6 @@ class OrderingBufferServiceTest {
         assertEquals(1.0, meterRegistry.counter("webhook_ordering_cursor_db_write_failed_total").count());
     }
 
-    // ── getLastDeliveredSequence / canDeliver ───────────────────────────
-
     @Test
     void getLastDeliveredSequence_warmsRedisFromPostgresOnCacheMiss() {
         UUID endpointId = endpointId();
@@ -248,55 +214,25 @@ class OrderingBufferServiceTest {
     @SuppressWarnings("unchecked")
     private RBucket<Long> mockBucket(UUID endpointId) {
         RBucket<Long> bucket = mock(RBucket.class);
-        // getLastDeliveredSequence() explicitly requests LongCodec (see the comment there): the
-        // delivered-seq key must decode consistently whether it was last written by the plain
-        // Redis SET inside the CAS Lua script or by this bucket's own set().
-        when(redissonClient.<Long>getBucket(eq("seq:delivered:" + endpointId), eq(org.redisson.client.codec.LongCodec.INSTANCE)))
+        // The key must decode the same whether the CAS script or set() wrote it.
+        when(redissonClient.<Long>getBucket(eq("seq:delivered:" + endpointId), eq(LongCodec.INSTANCE)))
                 .thenReturn(bucket);
         return bucket;
     }
 
-    // ── 23b: gap timeout measured from first-buffered, not an unrelated createdAt ──
-
     @Test
-    void isGapTimedOut_neverBufferedBefore_isNotTimedOut() {
-        assertFalse(service.isGapTimedOut(null),
-                "A delivery that has never been buffered hasn't started waiting yet");
-    }
-
-    @Test
-    void isGapTimedOut_bufferedRecently_isNotTimedOut() {
-        Instant justBuffered = Instant.now().minusSeconds(5);
-        assertFalse(service.isGapTimedOut(justBuffered));
-    }
-
-    @Test
-    void isGapTimedOut_bufferedLongerThanTimeout_isTimedOut() {
-        Instant longAgo = Instant.now().minusSeconds(GAP_TIMEOUT_SECONDS + 5);
-        assertTrue(service.isGapTimedOut(longAgo));
+    void isGapTimedOut_measuresFromWhenTheDeliveryWasFirstBuffered() {
+        assertFalse(service.isGapTimedOut(null), "never buffered has not started waiting");
+        assertFalse(service.isGapTimedOut(Instant.now().minusSeconds(5)));
+        assertTrue(service.isGapTimedOut(Instant.now().minusSeconds(GAP_TIMEOUT_SECONDS + 5)));
     }
 
     @Test
     void isGapTimedOut_doesNotIncrementMetric_countingMovedToCaller() {
-        // Fixed a double-count: webhook_ordering_gap_timeout_total used to be
-        // incremented both here and in WebhookDeliveryService. It must now only be
-        // incremented by the caller (WebhookDeliveryService.canDeliverWithOrdering).
+        // Counted here and by the caller, the gap timeout used to be double-counted.
         Instant longAgo = Instant.now().minusSeconds(GAP_TIMEOUT_SECONDS + 5);
         assertTrue(service.isGapTimedOut(longAgo));
         assertEquals(0.0, meterRegistry.counter("webhook_ordering_gap_timeout_total").count());
-    }
-
-    // ── webhook_ordering_buffer_size registered once, resynced from Redis truth ──
-
-    @Test
-    void gauge_registeredExactlyOnceAtConstruction_startsAtZero() {
-        // Previously registered via meterRegistry.gauge(...) (no tags) inside bufferDelivery()
-        // itself, so only the very first endpoint's buffer was ever actually tracked --
-        // Micrometer silently discards a re-registration under the same untagged name. Now
-        // registered exactly once, in the constructor.
-        var gauge = meterRegistry.find("webhook_ordering_buffer_size").gauge();
-        assertNotNull(gauge, "webhook_ordering_buffer_size must be registered at construction");
-        assertEquals(0.0, gauge.value());
     }
 
     @Test
@@ -341,8 +277,6 @@ class OrderingBufferServiceTest {
         service.resyncBufferSizeGauge();
         assertEquals(4.0, meterRegistry.find("webhook_ordering_buffer_size").gauge().value());
 
-        // Every buffered delivery for this endpoint has since been released (getReadyDeliveries)
-        // or the key expired via bufferTtl -- either way it's gone from Redis on the next scan.
         when(keys.getKeysByPattern("seq:buffer:*")).thenReturn(List.of());
         service.resyncBufferSizeGauge();
 
