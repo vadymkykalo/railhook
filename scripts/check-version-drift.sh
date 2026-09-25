@@ -23,7 +23,7 @@ cd "$(git rev-parse --show-toplevel)"
 # plugin).
 pom_version=$(grep -m1 '<version>' pom.xml | sed -E 's/.*<version>([^<]+)<\/version>.*/\1/')
 # develop legitimately runs a version ahead of the last release between
-# release branches (see CONTRIBUTING.md's Release Process) — strip any
+# release branches, so strip any
 # -SNAPSHOT suffix before comparing so that's not reported as drift.
 pom_compare="${pom_version%-SNAPSHOT}"
 
