@@ -138,7 +138,7 @@ describe('PlatformOverviewPage', () => {
       daily30d: DAYS, activation30d: { signups: 0, verified: 0, organizations: 0, withProject: 0, withEvent: 0 },
     });
     renderPage(<PlatformOverviewPage />, { path: '/admin/platform', initialEntry: '/admin/platform' });
-    expect(await screen.findByText(/Only accounts listed in PLATFORM_ADMIN_EMAILS/)).toBeInTheDocument();
+    expect(await screen.findByText(/accounts listed in PLATFORM_ADMIN_EMAILS/)).toBeInTheDocument();
     expect(screen.getByText(/suspending or reinstating an organization/)).toBeInTheDocument();
   });
 

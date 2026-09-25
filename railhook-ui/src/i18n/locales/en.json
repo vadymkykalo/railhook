@@ -29,7 +29,7 @@
     },
     "createRule": "Create Rule",
     "deleteDialog": {
-      "description": "This will permanently delete the rule and stop monitoring. Existing alert events will remain.",
+      "description": "Deletes the rule. Alerts it already raised stay in the history.",
       "title": "Delete alert rule?"
     },
     "deleteRule": "Delete rule",
@@ -60,7 +60,7 @@
     "noEvents": "No alerts fired",
     "noEventsDesc": "Alert rules will fire events here when conditions are met",
     "noRules": "No alert rules",
-    "noRulesDesc": "Create your first alert rule to monitor delivery health",
+    "noRulesDesc": "A rule raises an alert when failures or latency cross its threshold.",
     "resolve": "Resolve",
     "resolveAll": "Resolve All",
     "resolved": "Resolved",
@@ -77,7 +77,7 @@
     "snooze": "Snooze",
     "snoozeFor": "Snooze {{hours}}h",
     "snoozed": "Snoozed",
-    "subtitle": "Monitor delivery health and get notified of issues",
+    "subtitle": "Get notified when failures, failed messages or latency cross a threshold.",
     "threshold": "Threshold",
     "tiles": {
       "allClear": "All clear",
@@ -175,7 +175,7 @@
     "refresh": "Refresh",
     "responseLatency": "Response Latency",
     "responseLatencyDesc": "Average latency over time",
-    "subtitle": "Real-time webhook delivery metrics",
+    "subtitle": "Success rate, latency and volume of deliveries.",
     "successRate": "Success Rate",
     "throughput": "Throughput",
     "tiles": {
@@ -188,7 +188,7 @@
   "apiKeys": {
     "activeKey": "Active",
     "createDialog": {
-      "description": "Add a new API key to send events to this project",
+      "description": "Used to send events to this project.",
       "expiration": "Expiration",
       "expirationHint": "The key stops working on this date. Rotate it before then to avoid downtime.",
       "expires1y": "1 year",
@@ -196,7 +196,7 @@
       "expires7d": "7 days",
       "expires90d": "90 days",
       "name": "Key Name",
-      "nameHint": "A descriptive name to identify this API key",
+      "nameHint": "Where it is used, e.g. billing-service.",
       "namePlaceholder": "Production API Key",
       "noExpiration": "No expiration",
       "scope": "Permissions",
@@ -213,24 +213,24 @@
     "keyDialog": {
       "copied": "Copied",
       "copyKey": "Copy key",
-      "description": "Save this API key securely. It won't be shown again.",
+      "description": "Send it in the X-API-Key header.",
       "done": "Done",
       "howToUse": "How to use it",
       "label": "API Key",
-      "onlyChance": "This is the only time the key is shown. Copy it now — it cannot be read again.",
+      "onlyChance": "Shown only now. Copy it; it cannot be read again.",
       "title": "API Key Created Successfully"
     },
     "lastUsed": "Last used",
     "never": "Never",
     "noKeys": "No API keys yet",
-    "noKeysDesc": "Create your first API key to start sending events",
-    "noKeysDescViewer": "No API keys have been created yet. Ask a Developer or Owner to create one.",
+    "noKeysDesc": "Your backend needs a key to send events.",
+    "noKeysDescViewer": "Ask a Developer or Owner to create one.",
     "retiring": "Retiring",
     "retiringHint": "Replaced by a newer key. This one keeps working until the time above, then stops.",
     "revoke": "Revoke",
     "revokeDialog": {
-      "description": "This action cannot be undone. This API key will stop working immediately and all requests using it will be rejected.",
-      "impactCallers": "Every caller using it — scripts, services, CI — stops sending events",
+      "description": "The key stops working at once, and every request using it is rejected. This cannot be undone.",
+      "impactCallers": "Every script, service or CI job using it stops sending events",
       "impactImmediate": "Requests signed with this key start failing immediately",
       "impactPermanent": "The key cannot be restored; issue a new one instead",
       "title": "Revoke API Key?"
@@ -329,7 +329,7 @@
     "noLogsDesc": "Actions like creating endpoints, rotating secrets will appear here",
     "noMatches": "No events match these filters",
     "noMatchesDesc": "Widen the date range, or clear a filter to see everything again",
-    "subtitle": "Track who did what in your organization",
+    "subtitle": "Who changed what in this organization, and when.",
     "title": "Audit Log"
   },
   "auth": {
@@ -362,7 +362,7 @@
       "continue": "Continue",
       "denied": "Device authorization denied",
       "deniedDesc": "The CLI session was refused. Whoever asked for this code will not get in.",
-      "deniedHint": "If you did not start this from a terminal of your own, change your password — someone else knows enough to ask.",
+      "deniedHint": "If you did not start this from your own terminal, change your password: someone else knows enough to ask.",
       "deniedTitle": "Authorization Denied",
       "deny": "This wasn't me",
       "denyFailed": "Failed to deny this device code. It may be invalid or already used.",
@@ -398,17 +398,17 @@
     },
     "intent": {
       "both": "Both",
-      "bothDesc": "Full bidirectional webhook infrastructure — send and receive.",
+      "bothDesc": "Send events to your customers and receive webhooks from providers.",
       "continue": "Continue",
       "receive": "I receive webhooks",
       "receiveDesc": "Ingest webhooks from providers like Stripe or GitHub, verify signatures, and forward to your services.",
       "send": "I send webhooks",
-      "sendDesc": "Deliver events to your customers' endpoints with retries, monitoring, and delivery guarantees.",
-      "subtitle": "This helps us tailor your experience. You can always change later.",
+      "sendDesc": "Deliver events to your customers' endpoints, with retries and signatures.",
+      "subtitle": "It decides what the dashboard shows first. You can change it later.",
       "title": "What brings you to Railhook?"
     },
     "login": {
-      "copyright": "© {{year}} Railhook. Built for production systems.",
+      "copyright": "© {{year}} Railhook",
       "createAccount": "Create account",
       "email": "Email address",
       "failed": "Login failed. Please try again.",
@@ -423,7 +423,7 @@
       "welcomeBack": "Welcome back!"
     },
     "panel": {
-      "caption": "Every event Railhook sends is signed, and every attempt it takes is recorded. When one fails, the ladder backs off and tries again — this one landed on the fourth attempt, fifteen minutes in.",
+      "caption": "Every event is signed and every attempt recorded. When one fails, Railhook waits longer and tries again: this one arrived on the fourth attempt, 15 minutes in.",
       "eyebrow": "A signed delivery",
       "railLabel": "Four attempts: three failed, the fourth returned 200"
     },
@@ -444,7 +444,7 @@
       "signIn": "Sign in",
       "submit": "Create account",
       "submitting": "Creating account...",
-      "subtitle": "Get started with your webhook infrastructure",
+      "subtitle": "Create an account to send and receive webhooks.",
       "success": "Account created! Please verify your email.",
       "terms": "By creating an account, you agree to our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
       "title": "Create your account",
@@ -464,7 +464,7 @@
       "submitting": "Resetting...",
       "subtitle": "Enter your new password below. It must be at least 8 characters and include uppercase, lowercase, a number, and a special character.",
       "success": "Password reset!",
-      "successMessage": "Your password has been successfully reset. You can now sign in with your new password.",
+      "successMessage": "Password reset. Sign in with the new one.",
       "successToast": "Password reset successfully!",
       "title": "Set new password",
       "tooShort": "Password must be at least 8 characters."
@@ -557,7 +557,7 @@
       "PAST_DUE": "Past due",
       "SUSPENDED": "Suspended"
     },
-    "subtitle": "Manage your plan and usage",
+    "subtitle": "Your plan, its limits and invoices.",
     "switchPlan": "Switch",
     "title": "Billing",
     "tunnels": "CLI tunnels",
@@ -640,7 +640,7 @@
     "viewAll": "View all"
   },
   "configExport": {
-    "description": "Export or import project configuration (endpoints and subscriptions) as JSON",
+    "description": "Endpoints and subscriptions as a JSON file.",
     "exportBtn": "Export Config",
     "exporting": "Exporting...",
     "hint": "Export saves endpoints and subscriptions. Import skips duplicates by URL.",
@@ -703,7 +703,7 @@
         "desc": "Copy the HMAC secret to verify webhook signatures on your server",
         "pending": "Create an endpoint first to generate a signing secret.",
         "title": "Signing Secret",
-        "warning": "Store this secret securely — it won't be shown again. Use it to verify the X-Webhook-Signature header."
+        "warning": "Shown once. Use it to verify the X-Signature header."
       },
       "test": {
         "desc": "Send a test event to verify your endpoint is reachable",
@@ -755,14 +755,14 @@
     "newConnection": "New connection",
     "noSubscriptions": "No subscriptions",
     "noSubscriptionsDesc": "Nothing is subscribed, so this endpoint receives no events.",
-    "secretHidden": "The secret is stored hashed and is shown once, when it is created or rotated. Rotate it if it may have leaked — the old secret stops working immediately.",
+    "secretHidden": "Stored encrypted and shown once, when it is created or rotated. Rotate it if it may have leaked; the old one stops working at once.",
     "sendTest": "Send test event",
-    "standardSecretHidden": "The whsec_… form a Standard Webhooks library expects is derived from the same secret, and is shown beside it whenever the secret itself is.",
+    "standardSecretHidden": "The whsec_… form for Standard Webhooks libraries comes from the same secret and is shown with it.",
     "title": "Connection Map",
     "toggleSubscription": "Enable {{eventType}}"
   },
   "createSubscription": {
-    "descriptionCreate": "A subscription connects an event type to an endpoint. When a matching event is received, it will be delivered to the endpoint.",
+    "descriptionCreate": "Events of the matching type are delivered to the endpoint.",
     "descriptionEdit": "Update how events are routed to this endpoint",
     "fields": {
       "breaking": "Breaking",
@@ -806,7 +806,7 @@
     "submitCreate": "Create Subscription",
     "submitEdit": "Update Subscription",
     "summary": {
-      "description": "Every time an event matching {{eventType}} is received, it will be delivered to {{endpoint}}. You can send a test event from the Events page to verify everything works.",
+      "description": "Every event matching {{eventType}} goes to {{endpoint}}. Send a test event from the Events page to check.",
       "theEndpoint": "the selected endpoint",
       "title": "What happens next?"
     },
@@ -819,7 +819,7 @@
     "validation": {
       "endpointRequired": "Please select an endpoint that will receive the events",
       "eventTypeFormat": "Use lowercase letters, dots, underscores. Wildcards: order.* (one level), order.** (all nested), ** (catch-all)",
-      "eventTypeRequired": "Event type is required — specify which events this subscription should receive",
+      "eventTypeRequired": "Enter the event type this subscription receives",
       "headersObject": "Must be a JSON object with key-value pairs",
       "invalidJson": "Invalid JSON — check syntax",
       "maxAttempts": "Must be between 1 and 20 attempts",
@@ -926,9 +926,9 @@
     "bulkReplay": "Replay All {{status}}",
     "bulkReplayDialog": {
       "confirm": "Replay All",
-      "description": "This will re-send {{count}} deliveries with status {{status}}. Each delivery gets 3 more attempts, the first sent straight away.",
+      "description": "Re-sends {{count}} deliveries with status {{status}}, each with 3 more attempts, the first right away.",
       "title": "Replay all {{status}} deliveries?",
-      "warning": "Bulk replay may cause duplicate deliveries if the destination is not idempotent. Make sure your consumers can handle repeated events."
+      "warning": "A receiver that is not idempotent will process these events twice."
     },
     "bulkReplayHasMore": "Replayed {{replayed}} of {{total}} deliveries. Run again to process the rest.",
     "clearEventFilter": "Show all",
@@ -958,7 +958,7 @@
     "noDeliveriesDesc": "Deliveries will appear here once events are sent to your endpoints",
     "noDeliveriesForEvent": "No deliveries for this event",
     "noDeliveriesForEventAction": "Create Subscription",
-    "noDeliveriesForEventPlain": "Event type {{eventType}} matched no active subscription. A delivery is only created when an event type matches at least one subscription.",
+    "noDeliveriesForEventPlain": "Event type {{eventType}} matched no active subscription, so no delivery was created.",
     "nothingToReplay": "This delivery cannot be replayed",
     "rail": {
       "label": "{{count}} of {{total}} attempts used",
@@ -989,7 +989,7 @@
       "PROCESSING": "Delivering now...",
       "SUCCESS": "Delivered successfully"
     },
-    "subtitle": "Track webhook delivery attempts for <strong>{{project}}</strong>",
+    "subtitle": "Delivery attempts and responses in <strong>{{project}}</strong>",
     "toast": {
       "loadFailed": "Failed to load deliveries",
       "replayFailed": "Failed to replay delivery"
@@ -1012,7 +1012,7 @@
     "created": "Created",
     "deliveryAttempts": "Delivery Attempts",
     "deliveryId": "Delivery ID",
-    "description": "View delivery status, attempts, and responses",
+    "description": "Status, every attempt and the response it got.",
     "diagnosis": {
       "category": "Error Type",
       "noMoreRetries": "No more retries — moved to DLQ",
@@ -1042,7 +1042,7 @@
     "replay": "Replay",
     "replayDelivery": "Replay Delivery",
     "replayDialog": {
-      "description": "This will re-attempt delivery of the webhook to the endpoint. The delivery will be queued for immediate processing.",
+      "description": "Queues a new attempt to the endpoint right away.",
       "title": "Replay Delivery?"
     },
     "replayFromStep": {
@@ -1091,17 +1091,17 @@
     "last24h": "Last 24 Hours",
     "last7d": "Last 7 Days",
     "noItems": "No items in DLQ",
-    "noItemsDesc": "All deliveries are being processed successfully",
+    "noItemsDesc": "No delivery has used up its retries.",
     "purgeAll": "Purge All",
     "purgeDialog": {
-      "description": "This will permanently delete all {{count}} failed messages. This action cannot be undone.",
+      "description": "Deletes all {{count}} failed messages. This cannot be undone.",
       "impactIrreversible": "These items cannot be recovered or retried after purging",
       "impactItems": "{{count}} failed deliveries will be permanently deleted",
       "title": "Purge All DLQ Items?"
     },
     "replayOne": "Replay this delivery",
     "replaySelected": "Replay selected ({{count}})",
-    "subtitle": "Failed deliveries for <strong>{{project}}</strong>",
+    "subtitle": "Deliveries in <strong>{{project}}</strong> that used up every retry. Replay them once the endpoint is fixed.",
     "toast": {
       "bulkReplayed": "{{count}} deliveries queued for replay",
       "bulkReplayed_few": "{{count}} deliveries queued for replay",
@@ -1159,7 +1159,7 @@
       "allowedIpsHint": "For documentation only. Record which IPs your endpoint expects webhooks from.",
       "allowedIpsPlaceholder": "192.168.1.1, 10.0.0.0/8",
       "descPlaceholder": "Production webhook endpoint",
-      "description": "Add a new webhook endpoint to receive events",
+      "description": "A URL that receives this project's events as signed POST requests.",
       "descriptionLabel": "Description (optional)",
       "rateLimit": "Rate Limit (optional)",
       "rateLimitHint": "Maximum requests per second (leave empty for no limit)",
@@ -1168,12 +1168,12 @@
       "submitting": "Creating...",
       "title": "Create New Endpoint",
       "url": "Endpoint URL",
-      "urlHint": "The URL where webhook events will be sent",
+      "urlHint": "Must be reachable from Railhook.",
       "urlPlaceholder": "https://example.com/webhooks"
     },
     "createFirst": "Create endpoint",
     "deleteDialog": {
-      "description": "This action cannot be undone. This endpoint will stop receiving webhooks immediately.",
+      "description": "The endpoint stops receiving webhooks at once. This cannot be undone.",
       "title": "Delete endpoint?"
     },
     "deliveries": "Deliveries",
@@ -1184,11 +1184,11 @@
     "guidedSetup": "Guided Setup",
     "newEndpoint": "New Endpoint",
     "noEndpoints": "No endpoints yet",
-    "noEndpointsDesc": "Create your first endpoint to start receiving webhook deliveries",
+    "noEndpointsDesc": "An endpoint is a URL that receives this project's events.",
     "pending": "Pending",
     "projectNotFound": "Project not found",
     "rotateDialog": {
-      "description": "A new secret will be generated. You'll need to update your webhook signature verification with the new secret. The old secret will stop working immediately.",
+      "description": "Generates a new secret. The old one stops working at once, so update your signature check right after.",
       "rotating": "Rotating...",
       "submit": "Rotate Secret",
       "title": "Rotate webhook secret?"
@@ -1196,9 +1196,9 @@
     "rotateSecret": "Rotate Secret",
     "secretDialog": {
       "copy": "Copy secret",
-      "description": "Save this secret securely. It won't be shown again.",
+      "description": "Shown once. Copy it now.",
       "done": "Done",
-      "hint": "Use this secret to verify webhook signatures in your application.",
+      "hint": "Your server verifies webhook signatures with it.",
       "title": "New Webhook Secret"
     },
     "skip": "Skip",
@@ -1259,59 +1259,59 @@
     "verifyEndpoint": "Verify endpoint"
   },
   "errorBoundary": {
-    "description": "An unexpected error occurred. Reloading usually fixes it — if it keeps happening, share the details below with your team.",
+    "description": "Reload the page. If it happens again, send the details below to your team.",
     "goToDashboard": "Go to Dashboard",
     "reloadPage": "Reload page",
     "title": "Something went wrong"
   },
   "errorClass": {
     "auth": {
-      "fix": "The endpoint returned 401/403. Verify the webhook signature validation logic on your server and check that secrets match.",
+      "fix": "The endpoint returned 401/403. Check that your server verifies the signature with the current secret.",
       "label": "Authentication Rejected"
     },
     "clientError": {
-      "fix": "The endpoint rejected the request. Check the response body for details and verify your webhook handler accepts the expected content type and format.",
+      "fix": "The endpoint rejected the request. The response body usually says why.",
       "label": "Client Error (4xx)"
     },
     "connRefused": {
-      "fix": "The endpoint server is not accepting connections. Verify the server is running, the port is correct, and firewall rules allow inbound traffic.",
+      "fix": "Nothing accepted the connection. Check that the server is running, the port, and the firewall.",
       "label": "Connection Refused"
     },
     "dns": {
-      "fix": "The endpoint hostname could not be resolved. Check the URL for typos and verify DNS records are configured correctly.",
+      "fix": "The hostname does not resolve. Check the URL for typos and the DNS records.",
       "label": "DNS Resolution Failed"
     },
     "notFound": {
-      "fix": "The endpoint returned 404. Verify the webhook URL path is correct and the route is registered on your server.",
+      "fix": "The endpoint returned 404. Check the URL path and that the route exists on your server.",
       "label": "Endpoint Not Found"
     },
     "payloadTooLarge": {
-      "fix": "The endpoint returned 413. Increase the request body size limit on your server or reduce the event payload size.",
+      "fix": "The endpoint returned 413. Raise the body size limit on your server, or send smaller events.",
       "label": "Payload Too Large"
     },
     "rateLimited": {
-      "fix": "The endpoint returned 429. Your server is rejecting requests due to rate limiting. The delivery will be retried automatically with backoff.",
+      "fix": "The endpoint returned 429. Railhook retries with growing delays.",
       "label": "Rate Limited"
     },
     "serverError": {
-      "fix": "The endpoint server encountered an internal error. Check your server logs for exceptions. The delivery will be retried automatically.",
+      "fix": "The endpoint failed with a 5xx. Check your server logs. Railhook retries automatically.",
       "label": "Server Error (5xx)"
     },
     "ssl": {
-      "fix": "The SSL handshake failed. Ensure the SSL certificate is valid, not expired, and the certificate chain is complete.",
+      "fix": "The TLS handshake failed. Check that the certificate is valid, not expired, and served with its full chain.",
       "label": "SSL/TLS Error"
     },
     "timeout": {
-      "fix": "Your endpoint took too long to respond. Increase the timeout on your server or optimize the webhook handler to respond within 30 seconds.",
+      "fix": "No response within 30 seconds. Answer with a 2xx first and do the work afterwards.",
       "label": "Connection Timeout"
     },
     "transformCancelled": {
       "label": "A transformation cancelled it",
-      "fix": "Nothing was sent and nothing is owed. The transformation returned { cancel: true } for this event, and its reason is on the attempt. This is a filter doing its job, not a failure."
+      "fix": "Nothing was sent. The transformation returned { cancel: true }, and the reason is on the attempt. This is a filter working, not a failure."
     },
     "transformFailed": {
       "label": "The transformation failed",
-      "fix": "The endpoint was never asked. Open the transformation in the Transform Studio and run it against this event — the attempt's error names the reason and, for a script, the line. Until it is fixed the attempt keeps retrying, and the untransformed payload is never sent instead."
+      "fix": "The endpoint was never called. Run the transformation against this event in the Transform Studio; the attempt's error names the reason, and for a script the line. It keeps retrying until fixed, and the untransformed payload is never sent."
     },
     "unknown": {
       "fix": "An unexpected error occurred. Check the error message and response body for details.",
@@ -1341,8 +1341,8 @@
     "replayed": "Replayed",
     "replayedFailed": "Replayed {{count}} failed deliveries",
     "sanitized": "PII-Sanitized Payload",
-    "sanitizedHint": "This is the payload with PII masking rules applied — safe to share externally",
-    "sanitizedUseDebug": "Use \"Share Debug\" to create a PII-safe shareable link. The sanitized view is generated server-side with your project's PII rules.",
+    "sanitizedHint": "The payload with your PII masking rules applied.",
+    "sanitizedUseDebug": "Use \"Share Debug\" to share it as a link.",
     "schemaInfo": "Schema Information",
     "share": "Share Debug",
     "tabs": {
@@ -1363,7 +1363,7 @@
     "changes": "{{count}} difference(s)",
     "clearSelection": "Clear this event",
     "compare": "Compare",
-    "compareHint": "Both events keep their stored payloads — comparing changes nothing.",
+    "compareHint": "Comparing changes neither event.",
     "comparing": "Comparing events...",
     "diffType": {
       "ADDED": "Added",
@@ -1371,7 +1371,7 @@
       "REMOVED": "Removed"
     },
     "differencesDetected": "{{count}} difference(s) detected",
-    "emptyDescription": "Select two events above to compare their payloads side by side. Structural differences like added, removed, or changed fields will be highlighted automatically.",
+    "emptyDescription": "Pick two events above. Added, removed and changed fields are highlighted.",
     "emptyTitle": "Compare Event Payloads",
     "eventsCount": "{{count}} events",
     "inputEyebrow": "Input",
@@ -1390,7 +1390,7 @@
     "sanitizePii": "Mask PII before comparing",
     "sanitizePiiHint": "Apply your PII masking rules to both payloads before comparing them.",
     "searchPlaceholder": "Search by type or ID...",
-    "selectDescription": "Choose two events to compare their payloads. Search by event type or ID. Differences will be highlighted automatically.",
+    "selectDescription": "Search by event type or ID.",
     "selectEvents": "Select events to compare",
     "selectPlaceholder": "Select an event…",
     "subtitle": "Compare two event payloads side by side",
@@ -1414,7 +1414,7 @@
       "deliveries": "Deliveries",
       "noDeliveries": "No deliveries for this event",
       "noDeliveriesHint": "Events are only delivered to endpoints that have a matching subscription.",
-      "noDeliveriesNoSub": "No active subscriptions match event type <strong>{{eventType}}</strong>. Create a subscription for this event type to start receiving deliveries.",
+      "noDeliveriesNoSub": "No active subscription matches <strong>{{eventType}}</strong>. Create one to deliver this type.",
       "noPayload": "No payload",
       "notFound": "Event not found",
       "openFull": "Open Full Details",
@@ -1444,10 +1444,10 @@
       "invalidJson": "Invalid JSON format",
       "matchInfo": "{{count}} subscription(s) will receive this event.",
       "noMatchWarning": "No active subscriptions match this event type. The event will be saved but no deliveries will be created.",
-      "noteBody": "This event will create deliveries for all active subscriptions matching this event type. Check the Deliveries page to see processing results.",
+      "noteBody": "Creates a delivery for every active subscription matching this type. Results appear on the Deliveries page.",
       "noteLabel": "Note:",
       "payload": "Event Payload (JSON)",
-      "payloadHint": "Must be valid JSON. This data will be sent to webhook endpoints.",
+      "payloadHint": "Valid JSON, sent as the request body.",
       "schemaWarnings": "Accepted, but the payload does not match the active schema ({{count}}): {{errors}}",
       "send": "Send Event",
       "sending": "Sending...",
@@ -1455,7 +1455,7 @@
       "title": "Send Test Event"
     },
     "sendTest": "Send Event",
-    "subtitle": "Webhook events for <strong>{{project}}</strong>",
+    "subtitle": "Events sent to <strong>{{project}}</strong>, with the deliveries each one created",
     "title": "Events",
     "toast": {
       "loadFailed": "Failed to load events",
@@ -1581,7 +1581,7 @@
       "urlPlaceholder": "https://api.example.com/webhooks"
     },
     "deleteDialog": {
-      "description": "This destination will be permanently deleted. Incoming webhooks will no longer be forwarded to this URL.",
+      "description": "Incoming webhooks stop being forwarded to this URL. This cannot be undone.",
       "title": "Delete destination?"
     },
     "disabled": "Disabled",
@@ -1661,7 +1661,7 @@
     "pageTitle": "Failed Forwards",
     "purgeAll": "Purge All",
     "purgeDialog": {
-      "description": "This will permanently delete all {{count}} abandoned forwards. This action cannot be undone.",
+      "description": "Deletes all {{count}} abandoned forwards. This cannot be undone.",
       "impactIrreversible": "These forwards cannot be recovered or retried after purging",
       "impactItems": "{{count}} abandoned forwards will be permanently deleted",
       "title": "Purge All Failed Forwards?"
@@ -1718,18 +1718,18 @@
     },
     "noEvents": "No incoming events yet",
     "noEventsDesc": "Events will appear here when external providers send webhooks to your sources",
-    "noEventsNoSourcesDesc": "You need to create an incoming source first. Set up an ingress endpoint, then send webhooks to it.",
+    "noEventsNoSourcesDesc": "Create an incoming source first, then point a provider at its URL.",
     "noVerification": "No verification",
     "pageTitle": "Received events",
     "replay": {
-      "description": "This will re-send the event to all enabled destinations. Note: this may cause duplicate processing if the destination is not idempotent.",
+      "description": "Re-sends the event to every enabled destination.",
       "idempotencyWarning": "Ensure your destinations handle duplicate events (idempotency).",
       "replaying": "Replaying...",
       "submit": "Replay Event",
       "title": "Replay Event?"
     },
     "replaySelected": "Replay selected ({{count}})",
-    "subtitle": "Incoming webhook events for <strong>{{project}}</strong>",
+    "subtitle": "Webhooks received in <strong>{{project}}</strong>, with the signature check and forwards",
     "toast": {
       "bulkReplayed": "{{count}} incoming events queued for replay",
       "bulkReplayed_few": "{{count}} incoming events queued for replay",
@@ -1747,7 +1747,7 @@
     "columnSource": "Source",
     "create": "Create Source",
     "createDialog": {
-      "description": "Configure a new incoming webhook source to receive events from external providers",
+      "description": "A URL for one provider's webhooks, and how to verify them.",
       "hmacHeaderCannotClear": "A signature header cannot be removed once set. Enter the header your provider signs in, or X-Signature for the default.",
       "hmacHeaderName": "Signature Header",
       "hmacHeaderPlaceholder": "X-Hub-Signature-256",
@@ -1790,7 +1790,7 @@
     },
     "ingressUrl": "Ingress URL",
     "noSources": "No incoming sources yet",
-    "noSourcesDesc": "Create your first incoming source to start receiving webhooks from external providers",
+    "noSourcesDesc": "A source gives Stripe, GitHub or any other provider a URL to send webhooks to.",
     "provider": "Provider",
     "providerNames": {
       "GENERIC": "Generic",
@@ -1807,7 +1807,7 @@
     },
     "rateLimit": "Rate Limit",
     "security": {
-      "noVerificationDesc": "Without HMAC verification, anyone with the ingress URL can send events. Consider enabling HMAC_GENERIC or PROVIDER verification for production use.",
+      "noVerificationDesc": "Without verification, anyone who knows the ingress URL can send events. Turn on HMAC or provider verification.",
       "noVerificationTitle": "No signature verification"
     },
     "title": "Incoming Sources",
@@ -1841,7 +1841,7 @@
     "noToken": "Invalid invite link. Token or organization ID is missing.",
     "pleaseWait": "Please wait a moment.",
     "success": "Invitation Accepted!",
-    "successDesc": "You are now a member of the organization. Welcome aboard!"
+    "successDesc": "You are now a member of the organization."
   },
   "landing": {
     "nav": {
@@ -1860,7 +1860,7 @@
     },
     "hero": {
       "title": "Webhook infrastructure<br/>you can <hl>run yourself</hl>",
-      "lead": "Send webhooks to your customers and receive them from Stripe, GitHub and the rest. Retries, signatures, a customer portal and replay, with every attempt on record. An open-source webhook gateway under MIT.",
+      "lead": "Send webhooks to your customers and receive them from Stripe, GitHub and the rest. Retries, signatures, a customer portal, replay and a log of every attempt. An open-source webhook gateway under MIT.",
       "startFree": "Get started for free",
       "selfHost": "Self-host it",
       "tryDemo": "Try the live demo"
@@ -2047,7 +2047,7 @@
   "mcpApps": {
     "approvedBy": "Approved by",
     "connected": "Connected",
-    "description": "AI apps such as claude.ai and ChatGPT that were connected to this project by signing in. Each one acts with the access chosen when it was connected, and stops working when it is disconnected or when the person who connected it loses access.",
+    "description": "AI apps such as claude.ai and ChatGPT connected to this project. Each keeps the access chosen when it was connected, until it is disconnected or the person who connected it loses access.",
     "empty": "No apps are connected to this project.",
     "emptyHint": "To connect one, add a custom connector in claude.ai or ChatGPT with this URL and sign in:",
     "loadFailed": "Could not load the connected apps.",
@@ -2106,7 +2106,7 @@
       "emailRequired": "Email is required",
       "inviteLink": "Invite Link",
       "inviteLinkHint": "Share this link with the member. The link expires in 48 hours.",
-      "issuedDescription": "The invite is valid for 48 hours. Make sure it reaches the person before then.",
+      "issuedDescription": "The invite is valid for 48 hours.",
       "issuedTitle": "Invitation created",
       "ownerNote": "An Owner can change billing, remove members and delete the organization. Grant it sparingly.",
       "role": "Role",
@@ -2141,7 +2141,7 @@
     "reissueInviteFor": "Re-issue the invite for {{email}}",
     "remove": "Remove",
     "removeDialog": {
-      "description": "This member will lose access to the organization and all its resources. This action cannot be undone.",
+      "description": "They lose access to the organization and everything in it. This cannot be undone.",
       "impactAccess": "They lose access to every project in this organization",
       "impactKeys": "API keys they created keep working — revoke them separately",
       "impactReinvite": "You can invite them again at any time",
@@ -2168,10 +2168,10 @@
       "DISABLED": "Suspended",
       "INVITED": "Invited"
     },
-    "subtitle": "Manage access to this organization",
+    "subtitle": "Who can open this organization, and with which role.",
     "suspend": "Suspend",
     "suspendDialog": {
-      "description": "{{email}} keeps their membership and their role but cannot sign in to this organization, and any session they have open ends immediately. You can reinstate them at any time.",
+      "description": "{{email}} keeps membership and role but cannot sign in here, and open sessions end now. You can reinstate them at any time.",
       "title": "Suspend Member?"
     },
     "suspendMember": "Suspend {{email}}",
@@ -2236,17 +2236,17 @@
   },
   "mtls": {
     "caCert": "CA Certificate (PEM) — Optional",
-    "caCertHint": "Optional: Provide a custom CA certificate for server verification.",
+    "caCertHint": "Verifies your server's certificate when a public CA did not sign it.",
     "clearCa": "Clear CA certificate",
     "clearCert": "Clear certificate",
     "clearKey": "Clear private key",
     "clientCert": "Client Certificate (PEM)",
     "clientKey": "Client Private Key (PEM)",
-    "description": "Configure mutual TLS (client certificate authentication) for secure webhook delivery.",
+    "description": "Railhook presents this client certificate on every delivery to the endpoint.",
     "disable": "Disable mTLS",
     "enable": "Enable mTLS",
-    "enabledBanner": "mTLS is currently enabled for this endpoint. Upload new certificates to update or disable below.",
-    "securityWarning": "Keep your private key secure. It will be encrypted before storage but never share it.",
+    "enabledBanner": "mTLS is on for this endpoint. Upload new certificates to replace them, or turn it off below.",
+    "securityWarning": "The private key is stored encrypted. Do not share it.",
     "title": "mTLS Configuration",
     "toast": {
       "configured": "mTLS configured successfully",
@@ -2327,7 +2327,7 @@
     "title": "Page not found"
   },
   "onboarding": {
-    "allDone": "You're all set — Railhook is carrying your webhooks.",
+    "allDone": "Setup complete.",
     "allDoneAction": "Read the quickstart",
     "dismiss": "Dismiss",
     "progress": "{{done}} of {{total}}",
@@ -2376,7 +2376,7 @@
     "deleteImpactProjects_other": "{{count}} projects are deleted with their endpoints and sources",
     "deleteOrg": "Delete Organization",
     "deleteOrgButton": "Delete Organization Permanently",
-    "deleteOrgDesc": "Permanently delete this organization and all associated data including projects, endpoints, events, deliveries, and members. This action cannot be undone.",
+    "deleteOrgDesc": "Deletes the organization with its projects, endpoints, events, deliveries and members. This cannot be undone.",
     "deleteOrgFailed": "Failed to delete organization",
     "deleteOrgSuccess": "Organization deleted",
     "details": "Organization Details",
@@ -2386,8 +2386,8 @@
     "exportSuccess": "Data export downloaded",
     "exporting": "Exporting…",
     "gdprExport": "Data Export (GDPR)",
-    "gdprExportDesc": "Export all your organization data in machine-readable format",
-    "gdprExportInfo": "Download a JSON file containing all organization data: members, projects, endpoints, subscriptions, incoming sources, API keys (metadata only), and audit logs. No decrypted secrets are included.",
+    "gdprExportDesc": "Everything this organization holds, as one JSON file.",
+    "gdprExportInfo": "Members, projects, endpoints, subscriptions, incoming sources, API key metadata and the audit log. No secrets.",
     "idCopied": "Organization ID copied to clipboard",
     "manageMembers": "Manage {{count}} members",
     "manageMembers_few": "Manage {{count}} members",
@@ -2400,7 +2400,7 @@
     "orgNameHint": "Shown to every member and on invitations.",
     "orgNamePlaceholder": "Acme Inc.",
     "since": "Since {{date}}",
-    "subtitle": "Manage your organization details and membership",
+    "subtitle": "Name and ID, roles, configuration export, data export and deletion.",
     "title": "Organization Settings",
     "toast": {
       "updateFailed": "Failed to update organization",
@@ -2432,7 +2432,7 @@
     "count": "Masking rules · {{count}}",
     "custom": "Custom",
     "deleteDialog": {
-      "description": "This rule will be permanently removed. Event payloads will no longer be masked by this rule.",
+      "description": "Payloads stop being masked by this rule.",
       "title": "Delete masking rule?"
     },
     "jsonPath": "JSON path",
@@ -2510,7 +2510,7 @@
       "verified": "Email"
     },
     "denied": {
-      "description": "This panel is for the people who run this deployment. Owning an organization does not make you one: an operator lists their addresses in PLATFORM_ADMIN_EMAILS.",
+      "description": "Only operators listed in PLATFORM_ADMIN_EMAILS see this panel. Owning an organization is not enough.",
       "title": "Not a platform admin"
     },
     "detail": {
@@ -2587,7 +2587,7 @@
       "description": "The platform admin panel needs a sign-in from the last 12 hours.",
       "title": "Sign in again to continue"
     },
-    "scope": "Only accounts listed in PLATFORM_ADMIN_EMAILS, with a verified address and a sign-in from the last 12 hours, see this panel. Everything here is read-only except suspending or reinstating an organization, which asks for its name and is written to its audit log.",
+    "scope": "Visible only to verified accounts listed in PLATFORM_ADMIN_EMAILS that signed in within the last 12 hours. Read-only, except suspending or reinstating an organization, which asks for its name and goes to its audit log.",
     "signIn": {
       "google": "Google",
       "password": "Password"
@@ -2606,7 +2606,7 @@
       "reinstateReasonHint": "Kept in the organization's audit log.",
       "reinstateTitle": "Reinstate {{name}}?",
       "reinstated": "{{name}} is reinstated",
-      "suspendDescription": "Members can still sign in and read, but nothing changes — event ingestion included — until the organization is reinstated.",
+      "suspendDescription": "Members can still sign in and read, but nothing changes, event ingestion included, until the organization is reinstated.",
       "suspendReasonHint": "Shown to the organization's members.",
       "suspendTitle": "Suspend {{name}}?",
       "suspended": "{{name}} is suspended",
@@ -2633,7 +2633,7 @@
     "copyIdOf": "Copy the ID of {{name}}",
     "count": "Projects · {{count}}",
     "createDialog": {
-      "description": "Add a new project to organize your webhooks and integrations",
+      "description": "One per product or environment, with its own endpoints, keys and events.",
       "descriptionLabel": "Description (optional)",
       "descriptionPlaceholder": "What is this project for?",
       "name": "Project Name",
@@ -2655,7 +2655,7 @@
     "created": "Created {{date}}",
     "deleteDialog": {
       "confirm": "Delete project",
-      "description": "This action cannot be undone. This will permanently delete the project and all associated data.",
+      "description": "Deletes the project with its endpoints, keys, events and deliveries. This cannot be undone.",
       "impactEndpoints": "All endpoints and their secrets will be deleted",
       "impactEvents": "All events, deliveries, and delivery attempts will be lost",
       "impactKeys": "All API keys will be revoked immediately",
@@ -2672,15 +2672,15 @@
     },
     "newProject": "New Project",
     "noProjects": "No projects yet",
-    "noProjectsDesc": "Get started by creating your first project to manage webhooks and integrations",
-    "noProjectsViewer": "No projects have been created yet. Ask a Developer or Owner to create one.",
+    "noProjectsDesc": "A project holds endpoints, API keys and events.",
+    "noProjectsViewer": "Ask a Developer or Owner to create one.",
     "quickLinks": {
       "deliveries": "Deliveries",
       "endpoints": "Endpoints",
       "events": "Events",
       "keys": "Keys"
     },
-    "subtitle": "Manage your webhook projects and integrations",
+    "subtitle": "A project holds endpoints, API keys and events. Use one per product or environment.",
     "title": "Projects",
     "toast": {
       "createFailed": "Failed to create project",
@@ -2757,7 +2757,7 @@
       "PENDING": "Pending",
       "RUNNING": "Running"
     },
-    "subtitle": "Replay events by time range for <strong>{{project}}</strong>",
+    "subtitle": "Re-deliver every event from a time range in <strong>{{project}}</strong>. Existing deliveries stay as they are.",
     "title": "Event Time Machine",
     "toast": {
       "cancelFailed": "Failed to cancel replay",
@@ -2806,7 +2806,7 @@
     "created": "Rule created successfully",
     "createdAt": "Created",
     "deleteConfirm": {
-      "description": "This will permanently delete the rule and all its actions. Events will no longer be processed by this rule.",
+      "description": "Deletes the rule and its actions. Events stop going through it.",
       "title": "Delete Rule"
     },
     "deleteFailed": "Failed to delete rule",
@@ -2815,7 +2815,7 @@
     "disabled": "Rule disabled",
     "editRule": "Edit Rule",
     "empty": {
-      "description": "Create your first rule to automatically route, transform, or drop events based on conditions.",
+      "description": "A rule matches events by payload and routes, transforms or drops them.",
       "title": "No rules yet"
     },
     "enabled": "Rule enabled",
@@ -2887,7 +2887,7 @@
       "matches": "Matches",
       "total": "Total Rules"
     },
-    "subtitle": "Define IF-THEN rules to route, transform, or drop events automatically.",
+    "subtitle": "Match events by payload, then route them to extra endpoints, transform them or drop them.",
     "title": "Rules Engine",
     "toggleFailed": "Failed to toggle rule",
     "updated": "Rule updated successfully",
@@ -2950,7 +2950,7 @@
     "noChanges": "No schema changes recorded",
     "noChangesHint": "Changes appear when new schema versions are uploaded",
     "noEventTypes": "No event types registered",
-    "noEventTypesHint": "Create one manually or send an event — schemas are auto-discovered",
+    "noEventTypesHint": "Create one by hand, or send an event and its schema is discovered.",
     "noSearchResults": "No event types match your search",
     "noVersions": "No schema versions yet",
     "noVersionsHint": "Upload a JSON schema or send an event to auto-discover one",
@@ -2962,7 +2962,7 @@
     "status": {
       "ACTIVE": "Active"
     },
-    "subtitle": "Manage event type contracts, versioned schemas, and track breaking changes",
+    "subtitle": "A JSON Schema per event type, versioned, with breaking changes flagged.",
     "title": "Schema Registry",
     "typeCount": "Event types · {{count}}",
     "typeDescription": "Description",
@@ -3053,17 +3053,10 @@
     "role": "Role",
     "saved": "Saved",
     "security": {
-      "auditLogging": "Audit Logging",
-      "auditLoggingDesc": "All configuration changes are logged in the Audit Log. Review it regularly for unexpected changes to endpoints, API keys, or member permissions.",
-      "bestPracticeTitle": "Security Checklist",
-      "hmacVerification": "HMAC Signature Verification",
-      "hmacVerificationDesc": "Enable HMAC verification on all incoming sources to ensure only authenticated providers can send events. Sources without verification are marked with a warning badge.",
-      "secretRotation": "Secret Rotation",
-      "secretRotationDesc": "Rotate your endpoint signing secrets and HMAC secrets every 90 days. Use the rotate button on each endpoint or update the HMAC secret on incoming sources.",
-      "subtitle": "Security best practices and guidelines for your organization",
+      "subtitle": "Recommended practices for this organization.",
       "tip1": "Enable HMAC verification on all incoming sources",
       "tip2": "Rotate signing secrets and API keys every 90 days",
-      "tip3": "Use RBAC — grant DEVELOPER role instead of OWNER where possible",
+      "tip3": "Grant DEVELOPER instead of OWNER where you can",
       "tip4": "Review the Audit Log weekly for suspicious activity",
       "title": "Security"
     },
@@ -3076,7 +3069,7 @@
       "meta": "{{ip}} · last active {{lastSeen}}",
       "revoke": "Sign out",
       "revokeAll": "Sign out everywhere",
-      "revokeAllDesc": "Every device, including this one, is signed out immediately. Use this if you think someone else has access to your account.",
+      "revokeAllDesc": "Signs out every device, this one included. Use it if someone else may have access.",
       "revokeAllTitle": "Sign out everywhere?",
       "revokeCurrentDesc": "This is the device you are using. You will be signed out and returned to the login screen.",
       "revokeDesc": "That device is signed out immediately and has to sign in again.",
@@ -3088,9 +3081,9 @@
       "title": "Active sessions",
       "unknownIp": "unknown address"
     },
-    "subtitle": "Manage your account and organization settings",
+    "subtitle": "Your profile, password, sessions and time zone.",
     "timezone": {
-      "description": "Set your preferred timezone for displaying dates and times",
+      "description": "Dates and times across the app use it.",
       "hint": "All dates will be displayed in {{tz}}",
       "saved": "Timezone updated",
       "select": "Timezone",
@@ -3170,7 +3163,7 @@
     "createFirst": "Create Subscription",
     "created": "Created",
     "deleteDialog": {
-      "description": "This subscription will be permanently deleted. Events of this type will no longer be delivered to the endpoint.",
+      "description": "Events of this type stop going to the endpoint. This cannot be undone.",
       "title": "Delete Subscription?"
     },
     "descriptionV2": "Each row is one endpoint asking for one type of event. An event with no matching subscription is delivered nowhere.",
@@ -3179,7 +3172,7 @@
     "fifo": "FIFO",
     "filterEventType": "Filter by event type...",
     "newSubscription": "Create Subscription",
-    "noEventTypesHint": "Tip: Define event types in Schemas to get autocomplete and validation when creating subscriptions.",
+    "noEventTypesHint": "Event types defined in Schemas get autocomplete and validation here.",
     "noMatching": "No matching subscriptions",
     "noMatchingDesc": "Try adjusting your filters",
     "noSubscriptions": "No subscriptions yet",
@@ -3210,7 +3203,7 @@
     "copyContent": "Copy {{label}}",
     "deliveriesCreated": "Deliveries",
     "deliveryResults": "Delivery Results",
-    "description": "Send an event, ping an endpoint or check a signature — and watch what comes back.",
+    "description": "Send an event, ping an endpoint or check a signature, and see what comes back.",
     "emptyDesc": "Send an event or ping an endpoint to see results here",
     "emptyTitle": "Ready to test",
     "error": "Error",
@@ -3272,7 +3265,7 @@
     "verifyEmptyDesc": "Paste a secret, a signature header and the body to check them.",
     "verifyEmptyTitle": "Nothing checked yet",
     "verifyHeader": "Signature header",
-    "verifyHeaderHint": "The X-Railhook-Signature value from the request.",
+    "verifyHeaderHint": "The X-Signature value from the request.",
     "verifyInvalid": "No match",
     "verifyInvalidDesc": "The signature does not match this body and secret. Check that the body is byte-for-byte what was sent, and that the secret is the current one.",
     "verifyRunHint": "The secret and body never leave this browser.",
@@ -3308,7 +3301,7 @@
     "resultEyebrow": "Result",
     "selectEndpoint": "Select an endpoint to view requests",
     "selectEndpointHint": "Pick a test endpoint on the left to read what it captured.",
-    "subtitle": "Temporary endpoints to capture and inspect webhook requests",
+    "subtitle": "Temporary URLs that record every request sent to them.",
     "title": "Test Endpoints",
     "toast": {
       "clearFailed": "Failed to clear requests",
@@ -3332,7 +3325,7 @@
       "server": "Something went wrong on our end. Please try again later.",
       "tooManyRequests": "Too many requests. Please wait a moment.",
       "unauthorized": "Session expired. Please sign in again.",
-      "unhandledMutation": "That didn't go through. Try again — the details are in the request that failed.",
+      "unhandledMutation": "That didn't go through. Try again.",
       "validation": "Please check your input and try again."
     },
     "retry": "Retry"
@@ -3459,7 +3452,7 @@
     "editDesc": "Update the transformation template. A changed template is published as a new version you can come back to.",
     "editTitle": "Edit Transformation",
     "empty": "No transformations yet",
-    "emptyDesc": "Create reusable transformations to normalize payloads across subscriptions and incoming destinations.",
+    "emptyDesc": "A transformation reshapes a payload before it is sent. One can serve many subscriptions and destinations.",
     "enabledHint": "This transformation can be assigned to subscriptions",
     "expressionCount": "Expressions: {{count}}",
     "format": "Format",
@@ -3485,7 +3478,7 @@
     "searchPlaceholder": "Filter by name or description…",
     "status": "Status",
     "subscriptionCount": "Subscriptions: {{count}}",
-    "subtitle": "Reusable payload transformation templates for normalizing and reshaping webhook data.",
+    "subtitle": "JSON templates that reshape an event's payload before a subscription or destination sends it.",
     "template": "Template",
     "title": "Transformations",
     "toast": {
@@ -3524,7 +3517,7 @@
     },
     "restoredFrom": "Restored from v{{version}}",
     "sideLabel": "v{{version}} · {{when}}",
-    "subtitle": "Every template this transformation has published, newest first. Restoring one publishes it again as a new version — nothing published since is removed.",
+    "subtitle": "Every template this transformation has published, newest first. Restoring one publishes it again as a new version; nothing is removed.",
     "title": "Version history",
     "toast": {
       "restoreFailed": "Failed to restore this version",
@@ -3540,7 +3533,7 @@
     "client": "Client",
     "close": "Close tunnel",
     "closeDialog": {
-      "description": "This will immediately disconnect the CLI client and stop forwarding requests. The tunnel URL will no longer work.",
+      "description": "Disconnects the CLI and stops forwarding. The tunnel URL stops working.",
       "title": "Close tunnel?"
     },
     "closeNamed": "Close the tunnel {{name}}",
@@ -3558,7 +3551,7 @@
       "mine": "My tunnels",
       "pending": "Pending requests"
     },
-    "subtitle": "Active CLI tunnel sessions in your organization",
+    "subtitle": "CLI sessions forwarding webhooks to a local machine.",
     "title": "Tunnels",
     "toast": {
       "closeFailed": "Failed to close tunnel",
@@ -3639,7 +3632,7 @@
     "redirecting": "Redirecting to dashboard...",
     "success": "Email Verified!",
     "successAutoLogin": "Your email has been verified! Logging you in automatically...",
-    "successDesc": "Your email has been successfully verified. You can now use all features.",
+    "successDesc": "Your email is verified.",
     "verifying": "Verifying your email..."
   },
   "workflows": {
@@ -3697,7 +3690,7 @@
     "noWorkflows": "No workflows yet",
     "noWorkflowsHint": "Create your first workflow to automate webhook events",
     "nodeConfig": {
-      "apiKeyCopyWarning": "Copy this key now — it won't be shown again!",
+      "apiKeyCopyWarning": "Copy this key now. It is not shown again.",
       "apiKeyCreateFailed": "Failed to create API key",
       "apiKeyCreated": "API key created",
       "apiKeyName": "Key Name",
@@ -3759,13 +3752,13 @@
       "templateHint": "Use {{field.path}} placeholders",
       "timeout": "Timeout (seconds)",
       "transformSource": "Where the shape comes from",
-      "transformSourceHint": "A saved transformation is reusable and written in ${$.path}; a template here is one-off and written in {{field.path}}. They are different languages — text from one does nothing in the other.",
+      "transformSourceHint": "A saved transformation is reusable and written in ${$.path}. A template here is one-off and written in {{field.path}}. Text from one does nothing in the other.",
       "transformSourceInline": "Inline",
       "transformSourceSaved": "Saved",
       "transformation": "Transformation",
       "transformationCreateFailed": "Could not create the transformation",
       "transformationCreated": "Transformation created and selected",
-      "transformationHint": "One of this project’s saved transformations — the same ones a rule action can use.",
+      "transformationHint": "A saved transformation of this project, the same list a rule action uses.",
       "transformationName": "Name",
       "transformationNamePlaceholder": "Flatten the customer",
       "url": "URL",
@@ -3857,15 +3850,15 @@
   },
   "setup": {
     "createProject": "Create project",
-    "needsProject": "It lives inside a project. Create one to start — it takes a few seconds, and you land right back here.",
+    "needsProject": "It lives inside a project. Create one and you come straight back here.",
     "needsProjectViewer": "It lives inside a project, and this organization has none yet. Ask an owner or developer to create one.",
     "firstRunSubtitle": "Four steps from here to your first delivered webhook.",
     "firstStep": "Create a project",
-    "firstStepDesc": "A project holds your endpoints, API keys and events — one per product or environment.",
+    "firstStepDesc": "A project holds your endpoints, API keys and events. Use one per product or environment.",
     "purpose": {
       "connections": "Where your events go: endpoints, subscriptions, incoming sources and the rules between them.",
       "events": "Every event your application sends or receives, with its payload and the deliveries it made.",
-      "deliveries": "Each attempt to deliver an event — retries, failures, and the failed messages you can send again.",
+      "deliveries": "Each attempt to deliver an event: retries, failures, and failed messages you can send again.",
       "workflows": "Automations that run a sequence of steps when an event arrives.",
       "analytics": "How deliveries are going over time: success rate, latency, alerts and usage.",
       "develop": "Tools for trying things out: send test events, shape payloads, and inspect what arrives."
@@ -4066,7 +4059,7 @@
     },
     "secret": {
       "title": "Your signing secret",
-      "description": "Use it to verify that deliveries come from us. It is shown only now — copy it somewhere safe.",
+      "description": "Use it to verify that deliveries come from us. It is shown only now, so copy it somewhere safe.",
       "label": "Signing secret",
       "standardLabel": "Standard Webhooks secret (whsec_…)",
       "done": "I've saved it"
@@ -4622,7 +4615,7 @@
   "demo": {
     "page": {
       "title": "The live demo",
-      "lead": "The real Railhook dashboard, signed in to a sample shop with a day of traffic: deliveries, retries, a failed message, Stripe and GitHub webhooks. Look at anything — nothing can be changed.",
+      "lead": "The real Railhook dashboard, signed in to a sample shop with a day of traffic: deliveries, retries, a failed message, Stripe and GitHub webhooks. Nothing can be changed.",
       "opening": "Opening the demo…",
       "start": "Open the demo",
       "failed": "The demo could not be opened.",
