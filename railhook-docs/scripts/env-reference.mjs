@@ -1,22 +1,4 @@
 #!/usr/bin/env node
-/**
- * Derives `src/data/env-reference.json` from the repository's `.env.dist`.
- *
- * `.env.dist` is where every setting is documented — CLAUDE.md requires it of each new
- * variable — so the configuration reference is read from there rather than retyped. A
- * variable added with its comment appears in the docs on the next regeneration, and CI
- * fails while the committed JSON lags behind.
- *
- * What the parser understands, because it is what the file does:
- *   - a section is a `# ----` rule with an upper-case title beside it, or `# ─── Title ───`;
- *   - a variable's description is the comment block directly above it, with no blank line;
- *   - consecutive variables with no comment between them share that description;
- *   - `# KEY=value` is a documented variable left unset, its value an example, not a default;
- *   - an `Options:` / `Note:` comment directly under a variable belongs to that variable.
- *
- *   node scripts/env-reference.mjs           regenerate (commit the result)
- *   node scripts/env-reference.mjs --check   fail if the committed copy is stale
- */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -27,13 +9,11 @@ const RULE = /^#\s*-{10,}\s*$/;
 const BANNER = /^#\s*={10,}\s*$/;
 const BOX_TITLE = /^#\s*─+\s*(.+?)\s*─+\s*$/;
 const ACTIVE_VAR = /^([A-Z][A-Z0-9_]*)=(.*)$/;
-// `# KEY=value` with no spaces in the value (or flags, `-Xms256m -Xmx384m`). Prose that
-// happens to start with an assignment — `# APP_ENV=production it arrives as JSON` — is not one.
+// No spaces in the value, so prose like `# APP_ENV=production it arrives as JSON` is not a variable.
 const COMMENTED_VAR = /^# ?([A-Z][A-Z0-9_]*)=(\S*|-\S.*)$/;
 const UPPER_TITLE = /^([A-Z][A-Z0-9 /&-]*[A-Z0-9)])(?:\s*(\(.*))?$/;
 const TRAILING_NOTE = /^(Options|Note):/;
 
-/** Upper-case words stay upper-case: they are acronyms, not shouting. */
 const ACRONYMS = new Set(['API', 'UI', 'CORS', 'JVM', 'DLQ', 'FIFO', 'CLI', 'SMTP', 'HTTP', 'TLS', 'DB', 'JWT', 'PII', 'README']);
 
 function sentenceCase(title) {
@@ -46,7 +26,6 @@ function sentenceCase(title) {
   });
 }
 
-/** Comment lines → text. A bare `#` is a paragraph break. */
 function toText(lines) {
   return lines
     .map((line) => line.replace(/^# ?/, ''))
@@ -62,9 +41,7 @@ export function parseEnvDist(source) {
   const sections = [];
   let section = { title: 'General', variables: [] };
   let comments = [];
-  /** The description shared by the current run of consecutive variables. */
   let runDescription = null;
-  /** The last variable, while a trailing note can still attach to it. */
   let lastVar = null;
   let lastWasActiveVar = false;
 
@@ -94,8 +71,7 @@ export function parseEnvDist(source) {
       continue;
     }
 
-    // `# ─── Dashboard error reporting ───` titles a few variables inside a larger section,
-    // not a section of its own: it leads their description.
+    // A boxed title heads a few variables inside a section, not a section of its own.
     const box = line.match(BOX_TITLE);
     if (box) {
       comments = [`# ${box[1]}.`, '#'];
@@ -105,7 +81,6 @@ export function parseEnvDist(source) {
     }
 
     if (RULE.test(line)) {
-      // Title above the rule (`# TITLE` then `# ----`), possibly followed by prose.
       const above = comments.length ? toText([comments[0]]).match(UPPER_TITLE) : null;
       if (above) {
         const rest = [...(above[2] ? [`# ${above[2]}`] : []), ...comments.slice(1)];
@@ -113,7 +88,6 @@ export function parseEnvDist(source) {
         comments = rest;
         continue;
       }
-      // Title between two rules (`# ----` / `# TITLE` / `# ----`).
       const next = lines[i + 1]?.trimEnd() ?? '';
       if (next.startsWith('#') && !RULE.test(next) && toText([next]).match(UPPER_TITLE)) {
         startSection(toText([next]).match(UPPER_TITLE).slice(1).filter(Boolean).join(' '));
@@ -132,8 +106,7 @@ export function parseEnvDist(source) {
       if (comments.length) {
         runDescription = toText(comments);
       } else if (commented && lastWasActiveVar) {
-        // `API_REPLICAS=1` followed by `# UI_MEMORY_LIMIT=128m`: a different setting, not
-        // one more member of the run above it.
+        // `# UI_MEMORY_LIMIT=128m` under `API_REPLICAS=1` is a new setting, not part of that run.
         runDescription = null;
       }
       comments = [];
@@ -156,7 +129,6 @@ export function parseEnvDist(source) {
         continue;
       }
       if (lastVar && comments.length === 0 && TRAILING_NOTE.test(toText(lines.slice(i - 1, i)))) {
-        // A second line continuing a trailing note.
         lastVar.description = `${lastVar.description}\n${text}`;
         continue;
       }
@@ -167,7 +139,6 @@ export function parseEnvDist(source) {
   }
   if (section.variables.length) sections.push(section);
 
-  // A name documented twice (once commented, once set) is listed once, at its first place.
   const seen = new Set();
   for (const s of sections) {
     s.variables = s.variables.filter((v) => (seen.has(v.name) ? false : seen.add(v.name)));

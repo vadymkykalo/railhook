@@ -1,13 +1,4 @@
 ---
-/**
- * The API reference: Scalar over the repository's committed `openapi.yaml`.
- *
- * Nothing here is written by hand — the spec is copied into `public/` at build
- * (scripts/copy-openapi.mjs), and `OpenApiDriftIntegrationTest` holds that spec to what the
- * API actually serves. Scalar is bundled, not loaded from a CDN, and makes no requests of its
- * own: no proxy, no telemetry, no hosted fonts. "Try it" sends straight to the origin the page
- * is served from — the reader's own instance, or railhook.io on the cloud.
- */
 const specUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/openapi.yaml`;
 ---
 
@@ -47,7 +38,6 @@ const specUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/openapi.yaml`;
     agent: { disabled: true },
     persistAuth: false,
     defaultHttpClient: { targetKey: 'shell', clientKey: 'curl' },
-    // Four ways to send a request: shell/curl, node/fetch, python/requests, php/guzzle.
     hiddenClients: {
       c: true,
       clojure: true,
@@ -88,15 +78,12 @@ const specUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/openapi.yaml`;
 </script>
 
 <style is:global>
-  /* The reference needs the width; the page has no table of contents of its own. */
+  /* The page has no table of contents, so the reference takes the full width. */
   .main-pane:has(.railhook-api-reference) .sl-container {
     max-width: none;
   }
 
-  /* The "Test Request" client is a full-viewport fixed layer, but Starlight isolates .main-pane,
-     so no z-index inside it can rise above the fixed header (10) and sidebar (5) — they painted
-     over its top and left edges. While the client is open, the pane itself is lifted above them;
-     only then, so scrolled content never slides over the header. */
+  /* Starlight isolates .main-pane, so the open Scalar client needs the pane lifted over the header. */
   .main-pane:has(.scalar-client--open) {
     position: relative;
     z-index: 20;
@@ -149,8 +136,7 @@ const specUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/openapi.yaml`;
     --scalar-sidebar-search-border-color: var(--rh-line-strong);
     --scalar-sidebar-search-color: var(--sl-color-gray-3);
 
-    /* Status hues stay status hues: response codes read ok / retry / halt. HTTP method colours
-       fall back to ink, so the page carries no extra chrome colour. */
+    /* Only status hues keep colour; HTTP method colours fall back to ink. */
     --scalar-color-green: #16a34a;
     --scalar-color-red: var(--rh-danger);
     --scalar-color-yellow: var(--rh-caution);

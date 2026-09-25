@@ -3,12 +3,6 @@ import assert from 'node:assert/strict';
 
 import { SITE_PLACEHOLDER, socialImageHead, pageFileFor, lastmodFor } from './seo.mjs';
 
-/*
- * Guide pages declared `twitter:card summary_large_image` and named no image, so a link to the
- * docs unfurled as a bare title in every chat and card preview. And the sitemap carried no
- * <lastmod>, so a crawler had no signal that a page had changed since it last came by.
- */
-
 test('every page names an absolute social image on the placeholder origin nginx rewrites', () => {
   const metas = Object.fromEntries(socialImageHead.map((e) => [e.attrs.property ?? e.attrs.name, e.attrs.content]));
   assert.equal(metas['og:image'], `${SITE_PLACEHOLDER}/social-card.png`);

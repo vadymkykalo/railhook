@@ -1,9 +1,4 @@
 ---
-/**
- * Replaces Starlight's theme <select>: one icon button, as in the dashboard header. It flips to
- * the opposite of the theme on screen, and stores the choice under Starlight's own key, so the
- * inline ThemeProvider script still applies it before first paint.
- */
 import { Icon } from '@astrojs/starlight/components';
 ---
 
@@ -48,6 +43,7 @@ import { Icon } from '@astrojs/starlight/components';
 </style>
 
 <script>
+  // Starlight's own key, so its ThemeProvider still applies the choice before first paint.
   const storageKey = 'starlight-theme';
 
   class RailhookThemeToggle extends HTMLElement {

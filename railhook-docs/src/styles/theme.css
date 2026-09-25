@@ -1,14 +1,4 @@
-/*
- * Railhook tokens mapped onto Starlight.
- *
- * Starlight's own styles live in cascade layers, so these unlayered rules win without
- * specificity games. Starlight names its scale for dark mode: "white" is the strongest text,
- * "black" the page, and it swaps the scale under [data-theme='light'].
- *
- * One accent, cyan, used as a fill behind ink (the active sidebar item, a hovered link, a
- * selection). Never as text or a thin line on white, where it cannot be read. Status hues are
- * for caution and danger asides only.
- */
+/* Starlight's styles are layered, so these unlayered rules win; its scale is named for dark mode. */
 
 :root {
   --sl-font: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -137,8 +127,6 @@
   --sl-color-hairline-shade: var(--rh-line);
 }
 
-/* ---------- base ---------- */
-
 body {
   -webkit-font-smoothing: antialiased;
   background-color: var(--rh-bg);
@@ -154,7 +142,6 @@ body {
   outline-offset: 2px;
 }
 
-/* No rounded corners anywhere. */
 .sl-markdown-content :is(img, video, iframe, details, pre, figure),
 .expressive-code,
 .expressive-code *,
@@ -165,8 +152,6 @@ dialog,
 dialog * {
   border-radius: 0 !important;
 }
-
-/* ---------- type: Geist 400 and 500 only ---------- */
 
 h1#_top {
   font-weight: 400;
@@ -187,7 +172,6 @@ h1#_top {
   font-weight: 400;
 }
 
-/* A hairline above each section, across the whole column. */
 .sl-markdown-content .sl-heading-wrapper.level-h2 {
   padding-top: 1.25rem;
   border-top: 1px solid var(--rh-line);
@@ -212,8 +196,6 @@ h1#_top {
   width: auto;
 }
 
-/* ---------- links: ink with a 1px underline, cyan behind on hover ---------- */
-
 .sl-markdown-content a:not(:where(.not-content *)) {
   color: var(--rh-ink);
   text-decoration: underline;
@@ -234,8 +216,6 @@ h1#_top {
 .sl-anchor-link:hover {
   background: none !important;
 }
-
-/* ---------- header ---------- */
 
 header.header {
   border-bottom: 1px solid var(--rh-line);
@@ -261,7 +241,6 @@ site-search kbd {
   border-radius: 0;
 }
 
-/* The search dialog. */
 site-search dialog {
   border: 1px solid var(--rh-line-strong);
   box-shadow: none;
@@ -280,13 +259,10 @@ site-search mark {
   color: var(--rh-on-hl);
 }
 
-/* ---------- sidebar ---------- */
-
 .sidebar-pane {
   border-inline-end: 1px solid var(--rh-line);
 }
 
-/* Group labels read as small uppercase mono labels. */
 #starlight__sidebar .large {
   font-family: var(--sl-font-mono);
   font-size: 0.6875rem;
@@ -318,8 +294,6 @@ site-search mark {
   font-weight: 500;
 }
 
-/* ---------- table of contents ---------- */
-
 starlight-toc h2,
 mobile-starlight-toc .toggle {
   font-family: var(--sl-font-mono);
@@ -342,8 +316,6 @@ starlight-toc a[aria-current='true'] {
   color: var(--rh-ink);
   box-shadow: inset 2px 0 0 var(--rh-ink);
 }
-
-/* ---------- asides: soft band, a rule on the left, a mono label ---------- */
 
 .starlight-aside {
   border: 0;
@@ -386,12 +358,9 @@ starlight-toc a[aria-current='true'] {
   color: var(--rh-ink);
 }
 
-/* ---------- tabs ---------- */
-
 starlight-tabs [role='tablist'] {
   border-bottom: 1px solid var(--rh-line);
-  /* A row of language tabs is wider than a phone: it scrolls sideways instead of running past the
-     edge of the page. On a wide screen it fits and nothing changes. */
+  /* A row of language tabs is wider than a phone, so it scrolls instead of overflowing. */
   overflow-x: auto;
   scrollbar-width: thin;
 }
@@ -415,10 +384,7 @@ starlight-tabs [role='tab'][aria-selected='true'] {
   box-shadow: inset 0 -2px 0 var(--rh-ink);
 }
 
-/* ---------- cards ---------- */
-
-/* Starlight's `1fr 1fr` lets a code block's min-content width widen one column and crush the
-   other; minmax(0, 1fr) keeps the two columns equal and lets the code scroll instead. */
+/* Starlight's `1fr 1fr` lets a code block crush the other column; minmax(0, 1fr) keeps them equal. */
 @media (min-width: 50rem) {
   .card-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -459,8 +425,6 @@ starlight-tabs [role='tab'][aria-selected='true'] {
   border-radius: 0;
 }
 
-/* ---------- previous / next ---------- */
-
 .pagination-links a {
   border: 1px solid var(--rh-line);
   border-radius: 0;
@@ -491,15 +455,11 @@ starlight-tabs [role='tab'][aria-selected='true'] {
   color: var(--rh-ink);
 }
 
-/* ---------- footer meta ---------- */
-
 .meta,
 .meta a {
   color: var(--rh-muted);
   font-size: 0.8125rem;
 }
-
-/* ---------- buttons ---------- */
 
 .sl-link-button {
   border-radius: 0;
@@ -532,15 +492,11 @@ starlight-tabs [role='tab'][aria-selected='true'] {
   color: var(--rh-ink);
 }
 
-/* ---------- badges ---------- */
-
 .sl-badge {
   border-radius: 0;
   font-family: var(--sl-font-mono);
   font-weight: 400;
 }
-
-/* ---------- steps: square numbers on a hairline rail ---------- */
 
 .sl-steps > li::before {
   background-color: var(--rh-bg);
@@ -555,8 +511,6 @@ starlight-tabs [role='tab'][aria-selected='true'] {
   background-color: var(--rh-line);
 }
 
-/* ---------- inline code ---------- */
-
 .sl-markdown-content :not(pre) > code {
   font-size: 0.85em;
   border: 0;
@@ -565,8 +519,6 @@ starlight-tabs [role='tab'][aria-selected='true'] {
   background-color: var(--rh-soft);
   color: var(--rh-ink);
 }
-
-/* ---------- tables ---------- */
 
 .sl-markdown-content table:not(:where(.not-content *)) {
   border-collapse: collapse;
@@ -587,8 +539,6 @@ starlight-tabs [role='tab'][aria-selected='true'] {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-
-/* ---------- details ---------- */
 
 .sl-markdown-content details:not(:where(.not-content *)) {
   border-inline-start-color: var(--rh-line-strong);

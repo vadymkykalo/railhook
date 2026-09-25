@@ -1,15 +1,4 @@
 ---
-/**
- * Every environment variable in `.env.dist`, searchable, grouped by its section there.
- *
- * Rendered from `src/data/env-reference.json`, which `scripts/env-reference.mjs` derives from
- * `.env.dist` — so a variable is documented by writing its comment in `.env.dist`, never here.
- * The descriptions are the file's own comments and stay in English on the Ukrainian page;
- * the table chrome is translated.
- *
- *   import EnvReference from '../../../components/EnvReference.astro';     (EN page)
- *   import EnvReference from '../../../../components/EnvReference.astro';  (uk/ page)
- */
 import data from '../data/env-reference.json';
 import { envParagraphs as paragraphs, envSectionId as slug } from './env-paragraphs.mjs';
 
