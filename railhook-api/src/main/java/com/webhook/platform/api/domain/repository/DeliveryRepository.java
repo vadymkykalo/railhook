@@ -157,6 +157,18 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
             @Param("projectId") UUID projectId,
             @Param("batchSize") int batchSize);
 
+    @Modifying
+    @Query(value = """
+            DELETE FROM deliveries
+             WHERE id IN (
+                   SELECT d.id FROM deliveries d
+                    WHERE d.status = 'DLQ'
+                      AND COALESCE(d.failed_at, d.updated_at) < :cutoff
+                    LIMIT :limit
+             )
+            """, nativeQuery = true)
+    int deleteExpiredDlq(@Param("cutoff") Instant cutoff, @Param("limit") int limit);
+
     /** Reseeds the Redis sequence counter after it is lost, instead of restarting from zero. */
     @Query("SELECT MAX(d.sequenceNumber) FROM Delivery d WHERE d.endpointId = :endpointId")
     Long findMaxSequenceNumber(@Param("endpointId") UUID endpointId);

@@ -164,7 +164,8 @@ SLACK
 WEBHOOK
     fi
 
-    if [ -n "${ALERTMANAGER_EMAIL_TO:-}" ]; then
+    # Info alerts stay up for days (a DLQ backlog); mailed, they repeated every 12 hours.
+    if [ -n "${ALERTMANAGER_EMAIL_TO:-}" ] && [ "$name" != railhook-info ]; then
       cat <<EMAIL
     email_configs:
       - to: $(q "$ALERTMANAGER_EMAIL_TO")

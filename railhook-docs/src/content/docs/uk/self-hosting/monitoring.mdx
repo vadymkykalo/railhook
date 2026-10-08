@@ -47,7 +47,7 @@ nginx проксує лише шляхи перевірок стану. Будь
    echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)" >> .env
    ```
 
-2. **Вкажіть, куди йдуть сповіщення.** Листи йдуть через SMTP-релей платформи (`EMAIL_FROM`, `SMTP_*`), якщо не задано `ALERTMANAGER_SMTP_*`. Кожен лист має посилання на Grafana на `MONITORING_DOMAIN`; без домену він пояснює SSH-тунель.
+2. **Вкажіть, куди йдуть сповіщення.** Листи йдуть через SMTP-релей платформи (`EMAIL_FROM`, `SMTP_*`), якщо не задано `ALERTMANAGER_SMTP_*`. Кожен лист має посилання на Grafana на `MONITORING_DOMAIN`; без домену він пояснює SSH-тунель. Info-сповіщення, як-от непорожній DLQ, поштою не надсилаються: вони можуть горіти днями, тому їх показує Grafana.
 
    ```bash
    echo "ALERTMANAGER_EMAIL_TO=you@example.com" >> .env

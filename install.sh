@@ -408,6 +408,20 @@ apply_settings() {
     printf '%s\n' "$input" | cut -d= -f1 | sort -u | sed 's/.*/settings: & set/'
 }
 
+# Every upgrade pulls about 1.5 GB of images and writes a dump; nothing removed them until the disk filled.
+prune() {
+    local registry ref
+    registry=$(grep '^DOCKER_REGISTRY=' .env 2>/dev/null | tail -1 | cut -d= -f2- || true)
+    registry=${registry:-ghcr.io/vadymkykalo/railhook}
+    for ref in $(docker images --format '{{.Repository}}:{{.Tag}}' | grep -E "^${registry//./\\.}-(api|worker|ui):" || true); do
+        case "${ref##*:}" in
+            "${1#v}"|"${2#v}") ;;
+            *) docker rmi "$ref" >/dev/null 2>&1 && echo "Removed image $ref" || true ;;
+        esac
+    done
+    { ls -1t backup-*.dump 2>/dev/null || true; } | tail -n +6 | while read -r f; do rm -f -- "$f"; echo "Removed $f"; done
+}
+
 case "${1:-help}" in
     start)   compose up -d ;;
     stop)    compose stop ;;
@@ -457,6 +471,7 @@ case "${1:-help}" in
         # Only the API runs migrations, and a new worker validates the schema when it starts.
         roll_api || { echo "The API did not come up; the worker was left as it was." >&2; exit 1; }
         up_one worker --remove-orphans
+        prune "${want:-$from}" "$from"
         echo "Upgraded from ${from}. To roll the images back, set the *_IMAGE_TAG lines in .env to ${from}"
         echo "and run ./railhook start. The schema does not roll back; restore the backup for that." ;;
     backup)
@@ -471,12 +486,13 @@ case "${1:-help}" in
             -Fc --no-owner --no-privileges > "$f" || { rm -f "$f"; echo "pg_dump failed." >&2; exit 1; }
         echo "Wrote $f. Keep .env with it: the encrypted columns need WEBHOOK_ENCRYPTION_KEY." ;;
     settings) apply_settings ;;
+    prune)   prune "$(grep '^API_IMAGE_TAG=' .env | cut -d= -f2- || true)" "${2:-}" ;;
     doctor)
         tag=$(grep '^API_IMAGE_TAG=' .env | cut -d= -f2- || true)
         case "$tag" in ''|latest) ref=main ;; *) ref="v${tag#v}" ;; esac
         curl -fsSL "${RAW}/${ref}/install.sh" | bash -s -- --check --dir "$(pwd)" ;;
     help|-h|--help)
-        echo "railhook start|stop|restart|status|logs [service]|upgrade [version]|backup|settings < file|doctor"
+        echo "railhook start|stop|restart|status|logs [service]|upgrade [version]|backup|settings < file|prune [keep-tag]|doctor"
         echo "Anything else is passed to docker compose. After editing .env, run ./railhook start." ;;
     *)       compose "$@" ;;
 esac
