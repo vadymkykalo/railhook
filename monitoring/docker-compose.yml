@@ -179,7 +179,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 96m
+          memory: 160m
 
   # pid: host makes the mount table the host's; without it the file systems listed are this
   # container's own bind mounts rather than the host's disks.
@@ -239,7 +239,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 192m
+          memory: 128m
 
   # Probes the public URLs from outside and the UI and Caddy from inside, so "the site is down"
   # and "the edge is down" read as different alerts.

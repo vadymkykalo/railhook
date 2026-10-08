@@ -331,6 +331,12 @@
           "description": "Days to keep Events and, by cascade, their Deliveries; -1 keeps them forever. The only bound\non those tables when billing is off. Matches DATA_RETENTION_ATTEMPTS_DAYS on purpose."
         },
         {
+          "name": "DATA_RETENTION_DLQ_DAYS",
+          "default": "14",
+          "example": null,
+          "description": "Days a Delivery or Forward stays in the DLQ (Failed Messages) before it is deleted; -1 keeps it\nuntil its Event expires."
+        },
+        {
           "name": "DATA_RETENTION_MAX_ATTEMPTS_PER_DELIVERY",
           "default": "10",
           "example": null,

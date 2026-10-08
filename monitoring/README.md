@@ -55,8 +55,8 @@ a site block for Grafana and a certificate. With `--behind-proxy`, point your pr
 | grafana | 320m | The only published port, `127.0.0.1:3001` |
 | prometheus | 384m | Retention `PROMETHEUS_RETENTION` (15d), `PROMETHEUS_RETENTION_SIZE` (4GB) |
 | alertmanager | 64m | Slack, webhook, email, Telegram; each on when its `ALERTMANAGER_*` variables are set |
-| loki, promtail | 320m, 96m | Logs of `api`, `worker`, `ui`, `caddy`, `db-backup`; kept `LOKI_RETENTION_PERIOD` (168h) |
-| node-exporter, cadvisor | 64m, 192m | Host and container metrics |
+| loki, promtail | 320m, 160m | Logs of `api`, `worker`, `ui`, `caddy`, `db-backup`; kept `LOKI_RETENTION_PERIOD` (168h) |
+| node-exporter, cadvisor | 64m, 128m | Host and container metrics |
 | blackbox | 32m | Probes `MONITORING_PROBE_URLS`, or `https://$RAILHOOK_DOMAIN/`, `/docs/`, `/actuator/health` |
 | backup-age | 8m | Age and size of the newest `webhook_platform_*.dump` in `MONITORING_BACKUP_DIR` |
 
@@ -65,7 +65,8 @@ Alert rules: `prometheus/alerts.yml` (the platform's, kept equal to the Helm cha
 container restarts, public endpoint down or slow, TLS expiry, stale or missing backup).
 Dashboards are provisioned from `grafana/dashboards/` and are read-only in the UI; edit the JSON.
 
-Email alerts use the platform's SMTP settings unless `ALERTMANAGER_SMTP_*` is set. To test the
+Email alerts use the platform's SMTP settings unless `ALERTMANAGER_SMTP_*` is set. Info alerts go
+to Slack, Telegram or a webhook but never by mail; Grafana shows them. To test the
 alert path:
 
 ```bash

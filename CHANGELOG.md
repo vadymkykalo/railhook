@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-10-08
+
+### Added
+
+- Deliveries and Forwards in the DLQ (Failed Messages) are deleted after `DATA_RETENTION_DLQ_DAYS`, 14 by default. Until now only Event retention removed them, after 90 days outgoing and 30 incoming. `-1` keeps the old behaviour.
+- `./railhook prune` removes the Railhook images of every version except the running one (and one more, if you name it) and all but the five newest `backup-*.dump` files. `./railhook upgrade` runs it at the end, keeping the version it upgraded from: each upgrade left about 1.5 GB of images and a dump behind.
+
+### Changed
+
+- Info alerts, such as a non-empty DLQ, are no longer mailed; they went out again every 12 hours for as long as they lasted. Slack, Telegram and the webhook still get them, and Grafana shows them.
+- Promtail's memory limit is 160 MB instead of 96 MB, which it sat at 94% of, and cAdvisor's is 128 MB instead of 192 MB.
+
 ## [3.6.1] - 2026-10-01
 
 ### Fixed

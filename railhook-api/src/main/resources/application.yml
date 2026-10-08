@@ -176,6 +176,7 @@ data-retention:
   successful-attempts-retention-days: ${DATA_RETENTION_SUCCESSFUL_ATTEMPTS_DAYS:14}
   incoming-events-retention-days: ${DATA_RETENTION_INCOMING_EVENTS_DAYS:30}
   events-retention-days: ${DATA_RETENTION_EVENTS_DAYS:90}
+  dlq-retention-days: ${DATA_RETENTION_DLQ_DAYS:14}
   max-attempts-per-delivery: ${DATA_RETENTION_MAX_ATTEMPTS_PER_DELIVERY:10}
   batch-size: ${DATA_RETENTION_BATCH_SIZE:1000}
   cleanup-cron: ${DATA_RETENTION_CRON:0 0 2 * * *}

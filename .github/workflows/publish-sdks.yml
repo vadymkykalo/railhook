@@ -186,12 +186,16 @@ jobs:
         run: ./mcp-publisher login github-oidc
 
       - name: Publish
-        # A re-run for a version already listed is not a failure.
+        # The registry often answers 504 after a minute without publishing; "already exists" means an earlier try landed.
         run: |
           set +e
-          OUTPUT=$(./mcp-publisher publish 2>&1); STATUS=$?
-          echo "$OUTPUT"
-          if [ $STATUS -ne 0 ] && echo "$OUTPUT" | grep -qi "already exists"; then exit 0; fi
+          for attempt in 1 2 3 4; do
+            OUTPUT=$(./mcp-publisher publish 2>&1); STATUS=$?
+            echo "$OUTPUT"
+            if [ $STATUS -eq 0 ] || echo "$OUTPUT" | grep -qi "already exists"; then exit 0; fi
+            echo "$OUTPUT" | grep -qE "status 5[0-9][0-9]" || exit $STATUS
+            sleep $((attempt * 30))
+          done
           exit $STATUS
 
   publish-python:

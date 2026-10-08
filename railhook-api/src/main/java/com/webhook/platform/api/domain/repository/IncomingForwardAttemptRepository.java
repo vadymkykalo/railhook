@@ -88,4 +88,16 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
             "JOIN IncomingSource s ON e.incomingSourceId = s.id " +
             "WHERE s.projectId = :projectId AND a.status = 'SUCCESS' AND a.finishedAt >= :since")
     long countSuccessfulByProjectSince(@Param("projectId") UUID projectId, @Param("since") Instant since);
+
+    @Modifying
+    @Query(value = """
+            DELETE FROM incoming_forward_attempts
+             WHERE id IN (
+                   SELECT a.id FROM incoming_forward_attempts a
+                    WHERE a.status = 'DLQ'
+                      AND COALESCE(a.finished_at, a.created_at) < :cutoff
+                    LIMIT :limit
+             )
+            """, nativeQuery = true)
+    int deleteExpiredDlq(@Param("cutoff") Instant cutoff, @Param("limit") int limit);
 }

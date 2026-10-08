@@ -9,7 +9,7 @@
     "source": "github",
     "subfolder": "sdks/mcp"
   },
-  "version": "3.6.1",
+  "version": "3.7.0",
   "remotes": [
     {
       "type": "streamable-http",
@@ -20,7 +20,7 @@
     {
       "registryType": "npm",
       "identifier": "@railhook/mcp",
-      "version": "3.6.1",
+      "version": "3.7.0",
       "transport": {
         "type": "stdio"
       },

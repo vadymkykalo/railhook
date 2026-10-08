@@ -71,6 +71,10 @@ describe('monitoring/docker-compose.yml', () => {
     expect(total).toBeLessThanOrEqual(1536);
   });
 
+  it("gives Promtail room over its ~90 MB working set, so its memory alert doesn't fire all day", () => {
+    expect(megabytes(/memory: (\S+)/.exec(services.get('promtail')!)![1])).toBeGreaterThanOrEqual(160);
+  });
+
   it('keeps metrics 15 days and logs 7 by default', () => {
     expect(services.get('prometheus')).toContain('--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}');
     expect(services.get('loki')).toContain('${LOKI_RETENTION_PERIOD:-168h}');
@@ -292,6 +296,19 @@ describe('alertmanager/render-config.sh', () => {
     expect(render(resend).config, 'without a URL the receiver is empty, and still valid').toMatch(
       /- name: railhook-heartbeat\n?$/,
     );
+  });
+
+  it('mails warnings and critical alerts but never info, which waits in Grafana', () => {
+    const { config } = render(resend);
+    const receiver = (name: string) => {
+      const start = config.indexOf(`- name: ${name}\n`);
+      expect(start, name).toBeGreaterThan(-1);
+      const next = config.indexOf('\n  - name: ', start + 1);
+      return config.slice(start, next < 0 ? undefined : next);
+    };
+    expect(receiver('railhook-critical')).toContain('email_configs');
+    expect(receiver('railhook-default')).toContain('email_configs');
+    expect(receiver('railhook-info')).not.toContain('email_configs');
   });
 
   it('adds Telegram only with a token and a numeric chat id', () => {

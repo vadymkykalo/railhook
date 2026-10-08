@@ -37,6 +37,8 @@ class NativeQueryTenantPredicateTest {
             "DeliveryAttemptRepository.deleteExcessAttemptsPerDelivery",
             "IncomingEventRepository.deleteOldIncomingEvents",
             "EventRepository.deleteOldEvents",
+            "DeliveryRepository.deleteExpiredDlq",
+            "IncomingForwardAttemptRepository.deleteExpiredDlq",
             // Resolved alert history for every organization at once.
             "AlertEventRepository.deleteResolvedBefore",
 

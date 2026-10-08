@@ -47,7 +47,7 @@ Only Grafana publishes a port, `127.0.0.1:3001`. Prometheus, Alertmanager and Lo
    echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)" >> .env
    ```
 
-2. **Say where alerts go.** Email uses the platform's relay (`EMAIL_FROM`, `SMTP_*`) unless you set `ALERTMANAGER_SMTP_*`. Each mail links to Grafana on `MONITORING_DOMAIN`; without a domain it explains the SSH tunnel.
+2. **Say where alerts go.** Email uses the platform's relay (`EMAIL_FROM`, `SMTP_*`) unless you set `ALERTMANAGER_SMTP_*`. Each mail links to Grafana on `MONITORING_DOMAIN`; without a domain it explains the SSH tunnel. Info alerts, such as a non-empty DLQ, are not mailed: they can stay up for days, so Grafana shows them instead.
 
    ```bash
    echo "ALERTMANAGER_EMAIL_TO=you@example.com" >> .env
