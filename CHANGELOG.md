@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-10-08
+
 ### Added
 
 - Deliveries and Forwards in the DLQ (Failed Messages) are deleted after `DATA_RETENTION_DLQ_DAYS`, 14 by default. Until now only Event retention removed them, after 90 days outgoing and 30 incoming. `-1` keeps the old behaviour.
