@@ -171,7 +171,7 @@
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>3.1.0</version>
+            <version>3.1.1</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -191,7 +191,7 @@
         <dependency>
             <groupId>org.redisson</groupId>
             <artifactId>redisson-spring-boot-starter</artifactId>
-            <version>4.7.0</version>
+            <version>4.8.0</version>
         </dependency>
         <!--
           webclient, not webflux. Boot 4 split WebClient's auto-configuration out of the
@@ -254,7 +254,7 @@
         <dependency>
             <groupId>net.javacrumbs.shedlock</groupId>
             <artifactId>shedlock-provider-jdbc-template</artifactId>
-            <version>7.9.0</version>
+            <version>7.10.1</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -339,7 +339,7 @@
                   junit-platform-launcher jars") instead of failing loudly.
                 -->
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.5.6</version>
+                <version>3.6.0</version>
             </plugin>
             <!--
               See the matching comment in railhook-common's
