@@ -1,3 +1,5 @@
+[![AgentHub 已收录：Railhook](https://myagenthub.cn/badge/io.github.vadymkykalo/railhook)](https://myagenthub.cn/p/io.github.vadymkykalo/railhook)
+
 <div align="center">
 
 <picture>
