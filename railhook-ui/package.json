@@ -77,7 +77,7 @@
     "tailwindcss": "^3.3.6",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.3.3",
-    "vite": "^7.1.12",
+    "vite": "^7.3.7",
     "vitest": "^4.1.11"
   },
   "overrides": {
