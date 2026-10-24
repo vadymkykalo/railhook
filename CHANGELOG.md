@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `ContainerMemoryNearLimit` measures RSS instead of the working set. The working set counts reclaimable kernel slab, which Promtail grows by about 6 MB a day by rewriting its positions file, so the alert fired nightly on a container using a quarter of its limit.
+
 ## [3.7.0] - 2026-10-08
 
 ### Added
