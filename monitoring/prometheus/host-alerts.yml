@@ -123,7 +123,8 @@ groups:
 
       - alert: ContainerMemoryNearLimit
         expr: |
-          (container_memory_working_set_bytes{name!=""}
+          # Not working_set: it counts reclaimable dentry slab, which Promtail grows by ~6 MB a day.
+          (container_memory_rss{name!=""}
             / (container_spec_memory_limit_bytes{name!=""} > 0)) * 100 > 90
         for: 15m
         labels:
