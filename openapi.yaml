@@ -9258,7 +9258,6 @@ components:
           description: Destination URL to forward webhooks to
           example: https://api.example.com/webhooks
           minLength: 1
-          pattern: ""
         authType:
           type: string
           description: Authentication type for the destination
@@ -9573,7 +9572,6 @@ components:
         url:
           type: string
           minLength: 1
-          pattern: ""
         description:
           type: string
           maxLength: 500
@@ -9738,11 +9736,11 @@ components:
           type: number
           format: double
           description: Required when the condition's configSchema lists it
-          minimum: 0
+          exclusiveMinimum: 0
         windowMinutes:
           type: integer
           format: int32
-          minimum: 0
+          exclusiveMinimum: 0
         endpointId:
           type: string
           format: uuid
@@ -9818,7 +9816,6 @@ components:
         url:
           type: string
           minLength: 1
-          pattern: ""
         description:
           type: string
           maxLength: 500
@@ -11544,8 +11541,6 @@ components:
         offset:
           type: integer
           format: int64
-        sort:
-          $ref: "#/components/schemas/SortObject"
         paged:
           type: boolean
         pageNumber:
@@ -11554,6 +11549,8 @@ components:
         pageSize:
           type: integer
           format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
         unpaged:
           type: boolean
     SortObject:
