@@ -42,7 +42,7 @@
           once would have made it impossible to say which of the two broke
           anything.
         -->
-        <spring-boot.version>4.1.1</spring-boot.version>
+        <spring-boot.version>4.1.2</spring-boot.version>
         <!--
           netty and lombok used to be pinned above what the Boot 3.5 BOM
           managed, because those pins carried CVEs the SCA gate failed on.
@@ -72,13 +72,13 @@
           `mvn dependency:tree -Dincludes=org.apache.tomcat.embed` - a version
           that still reads 11.0.24 there means the override is not taking.
         -->
-        <tomcat.version>11.0.25</tomcat.version>
+        <tomcat.version>11.0.27</tomcat.version>
         <!--
           The 2.0 line is the one built against Boot 4 (2.0.1's own poms name
           spring-boot 4.1.1); 1.x targets Boot 3 and does not start on 4.
           Imported only for the MCP server starter in railhook-api.
         -->
-        <spring-ai.version>2.0.1</spring-ai.version>
+        <spring-ai.version>2.0.2</spring-ai.version>
         <!--
           GraalJS, the sandbox JavaScript transformations run in. Declared once here and used by
           railhook-common (provided), railhook-api and railhook-worker (compile).
@@ -88,8 +88,8 @@
           dependency bump.
         -->
         <graaljs.version>24.1.2</graaljs.version>
-        <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
-        <jacoco.version>0.8.12</jacoco.version>
+        <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
+        <jacoco.version>0.8.16</jacoco.version>
         <!--
           Single knob controlling where the JaCoCo agent writes exec
           data AND where the per-module `report` goal reads it back from, so
