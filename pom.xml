@@ -133,6 +133,12 @@
                 <artifactId>tomcat-embed-el</artifactId>
                 <version>${tomcat.version}</version>
             </dependency>
+            <!-- springdoc 3.2.0 ships swagger-ui 5.34.0, whose bundled DOMPurify 3.4.16 fails the SCA gate (CVE-2026-116804, fixed in 3.4.17). -->
+            <dependency>
+                <groupId>org.webjars</groupId>
+                <artifactId>swagger-ui</artifactId>
+                <version>5.34.1</version>
+            </dependency>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
