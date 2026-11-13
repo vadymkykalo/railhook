@@ -4026,7 +4026,7 @@
       "title": "Cloud Free",
       "price": "Free",
       "body": "{{events}} events a month, {{projects}} projects, {{endpoints}} endpoints per project, {{retention}} days of history. All features included.",
-      "later": "Paid plans with support and higher limits will come later.",
+      "beyond": "Need more than this? Self-host: the same features, no licence key.",
       "cta": "Start free"
     },
     "selfHosted": {

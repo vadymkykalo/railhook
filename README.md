@@ -14,6 +14,7 @@ GitHub and others, with retries, signatures and a record of every attempt. Self-
 [![License: MIT](https://img.shields.io/badge/license-MIT-000000.svg)](./LICENSE)
 [![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fvadymkykalo%2Frailhook-000000?logo=docker&logoColor=white)](https://github.com/vadymkykalo?tab=packages&repo_name=railhook)
 [![Docker pulls](https://img.shields.io/docker/pulls/railhook/railhook-api)](https://hub.docker.com/r/railhook/railhook-api)
+[![mcp.market](https://mcp.market/badge/vadymkykalo-railhook.svg)](https://mcp.market/server/vadymkykalo-railhook)
 
 <a href="https://www.saashub.com/railhook?utm_source=badge&utm_campaign=badge&utm_content=railhook&badge_variant=color&badge_kind=approved"><img src="https://cdn-b.saashub.com/img/badges/approved-color.png?v=1" alt="Railhook on SaaSHub" height="40"></a>
 

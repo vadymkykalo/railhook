@@ -55,7 +55,7 @@ export default function PricingPage() {
                 retention: FREE_PLAN.retention,
               })}
             </p>
-            <p className="text-sm text-muted-foreground">{t('pricing.cloud.later')}</p>
+            <p className="text-sm text-muted-foreground">{t('pricing.cloud.beyond')}</p>
             <div className="mt-auto flex flex-wrap gap-2.5 pt-3">
               <Button asChild className="max-sm:w-full">
                 {isAuthenticated ? (

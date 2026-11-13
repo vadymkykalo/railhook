@@ -36,7 +36,7 @@ A dash means the vendor's pages did not settle the point either way, not that th
 
 - **Both directions.** Outgoing events to customer endpoints and incoming provider webhooks share one attempt lifecycle, one dashboard and one set of failed messages.
 - **Everything self-hosted.** Every feature is in the MIT repository, with no licence key. `BILLING_ENABLED` defaults to `false`.
-- **Railhook Cloud** runs at railhook.io on a free plan. Paid plans with support and higher limits will come later.
+- **Railhook Cloud** runs at railhook.io on a free plan. Above its limits, self-host: the same features, no licence key.
 - **Standard Webhooks signatures** alongside Railhook's own `X-Signature` header, with a grace window on secret rotation.
 - **Per-endpoint ordering**, opt-in, with a timeout so one stuck delivery cannot block an endpoint forever.
 - **Replay creates new deliveries** from stored events (Time Machine in the dashboard) instead of re-sending the original.
