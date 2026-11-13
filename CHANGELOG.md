@@ -6,8 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.1] - 2026-11-13
+
+### Changed
+
+- The pricing page and the comparison docs no longer promise paid Cloud plans "later": above the free limits, the answer is self-hosting, which has every feature.
+- Spring Boot 4.1.2, springdoc 3.2.0 and patch releases of the UI, docs, Node SDK and MCP bridge dependencies. `openapi.yaml` is regenerated: `@Positive` fields now state `exclusiveMinimum: 0`, which matches what the API already rejected.
+
 ### Fixed
 
+- The scheduled dependency scan failed daily on the DOMPurify bundled in Swagger UI (CVE-2026-116803, CVE-2026-116804). Swagger UI is pinned to 5.34.1, which ships the fixed DOMPurify 3.4.17.
 - `ContainerMemoryNearLimit` measures RSS instead of the working set. The working set counts reclaimable kernel slab, which Promtail grows by about 6 MB a day by rewriting its positions file, so the alert fired nightly on a container using a quarter of its limit.
 
 ## [3.7.0] - 2026-10-08
