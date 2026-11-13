@@ -72,7 +72,7 @@
           `mvn dependency:tree -Dincludes=org.apache.tomcat.embed` - a version
           that still reads 11.0.24 there means the override is not taking.
         -->
-        <tomcat.version>11.0.27</tomcat.version>
+        <tomcat.version>11.0.29</tomcat.version>
         <!--
           The 2.0 line is the one built against Boot 4 (2.0.1's own poms name
           spring-boot 4.1.1); 1.x targets Boot 3 and does not start on 4.
