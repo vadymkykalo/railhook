@@ -171,7 +171,7 @@
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>3.2.0</version>
+            <version>3.2.1</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -254,7 +254,7 @@
         <dependency>
             <groupId>net.javacrumbs.shedlock</groupId>
             <artifactId>shedlock-provider-jdbc-template</artifactId>
-            <version>7.10.1</version>
+            <version>7.12.0</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
